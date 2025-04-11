@@ -28,9 +28,6 @@ import (
 	"github.com/jinzhu/copier"
 )
 
-// EthereumProtocol - string representation for the EthereumProtocol protocol
-const EthereumProtocol = "Ethereum"
-
 var (
 	// ErrSDNUnavailable - represents SDN service unavailable
 	ErrSDNUnavailable = errors.New("SDN service unavailable")
@@ -219,7 +216,7 @@ func (s *realSDNHTTP) FetchBlockchainNetwork() error {
 	if prev != nil && s.networks[networkNum].MinTxAgeSeconds != prev.MinTxAgeSeconds {
 		log.Debugf("MinTxAgeSeconds changed from %v seconds to %v seconds after the update", prev.MinTxAgeSeconds, s.networks[networkNum].MinTxAgeSeconds)
 	}
-	if s.networks[networkNum].Protocol == EthereumProtocol && s.networks[networkNum].DefaultAttributes.TerminalTotalDifficulty == 0 {
+	if s.networks[networkNum].Protocol == types.EthereumProtocol && s.networks[networkNum].DefaultAttributes.TerminalTotalDifficulty == 0 {
 		s.networks[networkNum].DefaultAttributes.TerminalTotalDifficulty = big.NewInt(math.MaxInt)
 	}
 

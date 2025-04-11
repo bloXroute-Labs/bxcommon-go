@@ -23,6 +23,16 @@ var (
 	IPResolverHolder IPResolver
 )
 
+// MockIPResolver is the mock ip resolver
+type MockIPResolver struct {
+	IP string
+}
+
+// GetPublicIP is the mock ip resolver's `GetPublicIP` func
+func (m *MockIPResolver) GetPublicIP() (string, error) {
+	return m.IP, nil
+}
+
 // IPResolver represents an interface
 type IPResolver interface {
 	GetPublicIP() (string, error)

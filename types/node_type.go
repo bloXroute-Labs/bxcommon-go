@@ -5,12 +5,6 @@ import (
 	"strings"
 )
 
-// BSCMainnet - for BSC main net blockchain network name
-const BSCMainnet = "BSC-Mainnet"
-
-// Mainnet - for Ethereum main net blockchain network name
-const Mainnet = "Mainnet"
-
 // TimeDateLayoutISO - used to parse ISO time date format string
 const TimeDateLayoutISO = "2006-01-02"
 
@@ -31,9 +25,6 @@ type NetworkID int64
 
 // NetworkNum represents the network that a message is being routed in (Ethereum Mainnet, Ethereum Holesky, etc.)
 type NetworkNum uint32
-
-// IsGateway indicates if this instance is a gateway
-var IsGateway bool = true
 
 const (
 	// InternalGateway is a gateway run by bloxroute

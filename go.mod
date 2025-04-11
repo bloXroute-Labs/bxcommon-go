@@ -5,6 +5,7 @@ go 1.24.2
 require (
 	github.com/fluent/fluent-logger-golang v1.9.0
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/mux v1.8.1
 	github.com/jinzhu/copier v0.4.0
 	github.com/puzpuzpuz/xsync/v2 v2.5.1
 	github.com/rs/zerolog v1.34.0
