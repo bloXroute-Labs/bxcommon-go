@@ -55,14 +55,6 @@ var BlockchainNetworkToNetworkNum = map[string]NetworkNum{
 	Holesky:    HoleskyNum,
 }
 
-// NetworkToBlockDuration defines block interval for each network
-var NetworkToBlockDuration = map[string]time.Duration{
-	Mainnet:    12 * time.Second,
-	BSCMainnet: 3 * time.Second,
-	Holesky:    12 * time.Second,
-	BSCTestnet: 3 * time.Second,
-}
-
 // NetworkNumToChainID - Mapping from networkNum to chainID
 var NetworkNumToChainID = map[NetworkNum]NetworkID{
 	MainnetNum:    EthChainID,
@@ -76,4 +68,36 @@ var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
 	BSCMainnetNum: BSCMainnet,
 	BSCTestnetNum: BSCTestnet,
 	HoleskyNum:    Holesky,
+}
+
+var (
+	BSCMainnetLorentzTime = time.Date(2025, 4, 29, 5, 5, 0, 0, time.UTC)
+	BSCTestnetLorentzTime = time.Date(2025, 4, 8, 5, 5, 0, 0, time.UTC)
+	// TODO Update these times when Maxwell is activated on BSC Mainnet and BSC Testnet
+	BSCMainnetMaxwellTime time.Time
+	BSCTestnetMaxwellTime time.Time
+)
+
+// NetworkToBlockDuration defines block interval for each network
+func NetworkToBlockDuration(network string) time.Duration {
+	switch network {
+	case Mainnet:
+		return 12 * time.Second
+	case BSCMainnet:
+		if time.Now().After(BSCMainnetLorentzTime) {
+			return 1500 * time.Millisecond
+		}
+
+		return 3 * time.Second
+	case BSCTestnet:
+		if time.Now().After(BSCTestnetLorentzTime) {
+			return 1500 * time.Millisecond
+		}
+
+		return 3 * time.Second
+	case Holesky:
+		return 12 * time.Second
+	default:
+		return 0
+	}
 }
