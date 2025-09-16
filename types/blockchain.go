@@ -20,6 +20,8 @@ const BSCTestnet = "BSC-Testnet"
 // Holesky - for Holesky testnet blockchain network name
 const Holesky = "Holesky"
 
+const XLayerMainnet = "X-Layer-Mainnet"
+
 // MainnetNum - for Ethereum main net blockchain network number
 const MainnetNum NetworkNum = 5
 
@@ -31,6 +33,8 @@ const BaseChainID = 8453
 
 // BSCChainID - BSC chain ID
 const BSCChainID = 56
+
+const XLayerChainID = 196
 
 // EthChainID - eth chain ID
 const EthChainID NetworkID = 1
