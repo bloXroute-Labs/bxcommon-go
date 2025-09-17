@@ -20,6 +20,8 @@ const BSCTestnet = "BSC-Testnet"
 // Holesky - for Holesky testnet blockchain network name
 const Holesky = "Holesky"
 
+const XLayerMainnet = "X-Layer-Mainnet"
+
 // MainnetNum - for Ethereum main net blockchain network number
 const MainnetNum NetworkNum = 5
 
@@ -32,6 +34,8 @@ const BaseChainID = 8453
 // BSCChainID - BSC chain ID
 const BSCChainID = 56
 
+const XLayerChainID = 196
+
 // EthChainID - eth chain ID
 const EthChainID NetworkID = 1
 
@@ -41,6 +45,8 @@ const HoleskyChainID = 17000
 // BaseMainnetNum - for Base main net blockchain network number
 const BaseMainnetNum NetworkNum = 456
 
+const XLayerMainnetNum NetworkNum = 567
+
 // BSCTestnetNum - for BSC-Testnet blockchain network number
 const BSCTestnetNum NetworkNum = 42
 
@@ -49,25 +55,31 @@ const HoleskyNum NetworkNum = 49
 
 // BlockchainNetworkToNetworkNum converts blockchain network to number
 var BlockchainNetworkToNetworkNum = map[string]NetworkNum{
-	Mainnet:    MainnetNum,
-	BSCMainnet: BSCMainnetNum,
-	BSCTestnet: BSCTestnetNum,
-	Holesky:    HoleskyNum,
+	Mainnet:       MainnetNum,
+	BSCMainnet:    BSCMainnetNum,
+	BSCTestnet:    BSCTestnetNum,
+	Holesky:       HoleskyNum,
+	BaseMainnet:   BaseMainnetNum,
+	XLayerMainnet: XLayerMainnetNum,
 }
 
 // NetworkNumToChainID - Mapping from networkNum to chainID
 var NetworkNumToChainID = map[NetworkNum]NetworkID{
-	MainnetNum:    EthChainID,
-	BSCMainnetNum: BSCChainID,
-	HoleskyNum:    HoleskyChainID,
+	MainnetNum:       EthChainID,
+	BSCMainnetNum:    BSCChainID,
+	HoleskyNum:       HoleskyChainID,
+	BaseMainnetNum:   BaseChainID,
+	XLayerMainnetNum: XLayerChainID,
 }
 
 // NetworkNumToBlockchainNetwork - Mapping from networkNum to blockchain network
 var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
-	MainnetNum:    Mainnet,
-	BSCMainnetNum: BSCMainnet,
-	BSCTestnetNum: BSCTestnet,
-	HoleskyNum:    Holesky,
+	MainnetNum:       Mainnet,
+	BSCMainnetNum:    BSCMainnet,
+	BSCTestnetNum:    BSCTestnet,
+	HoleskyNum:       Holesky,
+	BaseMainnetNum:   BaseMainnet,
+	XLayerMainnetNum: XLayerMainnet,
 }
 
 var (
