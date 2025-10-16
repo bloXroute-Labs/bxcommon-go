@@ -246,6 +246,7 @@ type Account struct {
 	PrivateTransactionFee               BDNQuotaService        `json:"private_transaction_fee"`
 	OnlineGateways                      BDNQuotaService        `json:"online_gateways"`
 	OnlineSolanaGateways                BDNQuotaService        `json:"online_solana_gateways"`
+	SolanaTXStreamers                   BDNQuotaService        `json:"solana_tx_streamers"`
 	TxTraceRateLimit                    BDNQuotaService        `json:"tx_trace_rate_limitation"`
 	RelayLimit                          BDNQuotaService        `json:"relay_limit"`
 	MinAllowedNodes                     BDNQuotaService        `json:"min_allowed_nodes"`
