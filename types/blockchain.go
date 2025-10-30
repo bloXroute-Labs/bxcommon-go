@@ -95,18 +95,8 @@ func NetworkToBlockDuration(network string) time.Duration {
 	switch network {
 	case Mainnet:
 		return 12 * time.Second
-	case BSCMainnet:
-		if time.Now().After(BSCMainnetLorentzTime) {
-			return 1500 * time.Millisecond
-		}
-
-		return 3 * time.Second
-	case BSCTestnet:
-		if time.Now().After(BSCTestnetLorentzTime) {
-			return 1500 * time.Millisecond
-		}
-
-		return 3 * time.Second
+	case BSCMainnet, BSCTestnet:
+		return 750 * time.Millisecond
 	case Holesky:
 		return 12 * time.Second
 	default:
