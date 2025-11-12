@@ -22,6 +22,8 @@ const Holesky = "Holesky"
 
 const XLayerMainnet = "X-Layer-Mainnet"
 
+const HyperliquidMainnet = "Hyperliquid-Mainnet"
+
 // MainnetNum - for Ethereum main net blockchain network number
 const MainnetNum NetworkNum = 5
 
@@ -35,6 +37,9 @@ const BaseChainID = 8453
 const BSCChainID = 56
 
 const XLayerChainID = 196
+
+// HyperliquidChaind - Hyperliquicd chain ID
+const HyperliquidChainID = 999
 
 // EthChainID - eth chain ID
 const EthChainID NetworkID = 1
