@@ -59,6 +59,8 @@ const XLayerMainnetNum NetworkNum = 567
 // HyperliquidChaind - Hyperliquid network number (internal arbitrary, so we use same as chain id)
 const HyperliquidNum NetworkNum = 999
 
+const MonadMainnetNum NetworkNum = 143
+
 // BSCTestnetNum - for BSC-Testnet blockchain network number
 const BSCTestnetNum NetworkNum = 42
 
@@ -67,12 +69,14 @@ const HoleskyNum NetworkNum = 49
 
 // BlockchainNetworkToNetworkNum converts blockchain network to number
 var BlockchainNetworkToNetworkNum = map[string]NetworkNum{
-	Mainnet:       MainnetNum,
-	BSCMainnet:    BSCMainnetNum,
-	BSCTestnet:    BSCTestnetNum,
-	Holesky:       HoleskyNum,
-	BaseMainnet:   BaseMainnetNum,
-	XLayerMainnet: XLayerMainnetNum,
+	Mainnet:            MainnetNum,
+	BSCMainnet:         BSCMainnetNum,
+	BSCTestnet:         BSCTestnetNum,
+	Holesky:            HoleskyNum,
+	BaseMainnet:        BaseMainnetNum,
+	XLayerMainnet:      XLayerMainnetNum,
+	HyperliquidMainnet: HyperliquidNum,
+	MonadMainnet:       MonadMainnetNum,
 }
 
 // NetworkNumToChainID - Mapping from networkNum to chainID
@@ -82,6 +86,8 @@ var NetworkNumToChainID = map[NetworkNum]NetworkID{
 	HoleskyNum:       HoleskyChainID,
 	BaseMainnetNum:   BaseChainID,
 	XLayerMainnetNum: XLayerChainID,
+	HyperliquidNum:   HyperliquidChainID,
+	MonadMainnetNum:  MonadChainID,
 }
 
 // NetworkNumToBlockchainNetwork - Mapping from networkNum to blockchain network
@@ -92,6 +98,8 @@ var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
 	HoleskyNum:       Holesky,
 	BaseMainnetNum:   BaseMainnet,
 	XLayerMainnetNum: XLayerMainnet,
+	HyperliquidNum:   HyperliquidMainnet,
+	MonadMainnetNum:  MonadMainnet,
 }
 
 var (
