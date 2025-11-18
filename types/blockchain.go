@@ -98,6 +98,8 @@ var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
 	HoleskyNum:       Holesky,
 	BaseMainnetNum:   BaseMainnet,
 	XLayerMainnetNum: XLayerMainnet,
+	HyperliquidNum:   HyperliquidMainnet,
+	MonadMainnetNum:  MonadMainnet,
 }
 
 var (
