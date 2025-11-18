@@ -56,6 +56,9 @@ const BaseMainnetNum NetworkNum = 456
 
 const XLayerMainnetNum NetworkNum = 567
 
+// HyperliquidChaind - Hyperliquid network number (internal arbitrary, so we use same as chain id)
+const HyperliquidNum NetworkNum = 999
+
 // BSCTestnetNum - for BSC-Testnet blockchain network number
 const BSCTestnetNum NetworkNum = 42
 
