@@ -24,6 +24,8 @@ const XLayerMainnet = "X-Layer-Mainnet"
 
 const HyperliquidMainnet = "Hyperliquid-Mainnet"
 
+const MonadMainnet = "Monad-Mainnet"
+
 // MainnetNum - for Ethereum main net blockchain network number
 const MainnetNum NetworkNum = 5
 
@@ -40,6 +42,8 @@ const XLayerChainID = 196
 
 // HyperliquidChaind - Hyperliquicd chain ID
 const HyperliquidChainID = 999
+
+const MonadChainID = 143
 
 // EthChainID - eth chain ID
 const EthChainID NetworkID = 1
