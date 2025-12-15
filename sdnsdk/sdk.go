@@ -72,6 +72,9 @@ type SDNHTTP interface {
 	GetQuotaUsage(accountID string) (*QuotaResponseBody, error)
 	FindNewRelay(ctx context.Context, oldRelayIP string, oldRelayIPPort int64, relayInstructions chan RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap)
+	SetInternalGateway(state *message.InternalGateway) error
+	AddInternalGatewaySubscription(accountID types.AccountID) error
+	RemoveInternalGatewaySubscription(accountID types.AccountID) error
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -848,6 +851,37 @@ func (s *realSDNHTTP) Networks() *message.BlockchainNetworks {
 // SetNetworks setter for the private networks field
 func (s *realSDNHTTP) SetNetworks(networks message.BlockchainNetworks) {
 	s.networks = networks
+}
+
+// SetInternalGateway updates the current internal gateway state. [for internal use only]
+func (s *realSDNHTTP) SetInternalGateway(state *message.InternalGateway) error {
+	url := fmt.Sprintf("%v/internal-gateways/%v", s.sdnURL, s.nodeID)
+	stateBytes, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("could not serialize internal gateway state: %w", err)
+	}
+	if _, err = s.http(url, http.MethodPost, bytes.NewBuffer(stateBytes)); err != nil {
+		return fmt.Errorf("could not send internal gateway state: %w", err)
+	}
+	return nil
+}
+
+// AddInternalGatewaySubscription tries to add an account subscription. [for internal use only]
+func (s *realSDNHTTP) AddInternalGatewaySubscription(accountID types.AccountID) error {
+	url := fmt.Sprintf("%v/internal-gateways/%v/subscriptions/%v", s.sdnURL, s.nodeID, accountID)
+	if _, err := s.http(url, http.MethodPost, nil); err != nil {
+		return fmt.Errorf("could not send request to add internal gateway subscription: %w", err)
+	}
+	return nil
+}
+
+// RemoveInternalGatewaySubscription removes an account subscription. [for internal use only]
+func (s *realSDNHTTP) RemoveInternalGatewaySubscription(accountID types.AccountID) error {
+	url := fmt.Sprintf("%v/internal-gateways/%v/subscriptions/%v", s.sdnURL, s.nodeID, accountID)
+	if _, err := s.http(url, http.MethodDelete, nil); err != nil {
+		return fmt.Errorf("could not send request to remove internal gateway subscription: %w", err)
+	}
+	return nil
 }
 
 var (
