@@ -718,7 +718,7 @@ func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if resp.StatusCode == http.StatusServiceUnavailable {
 			log.Debugf("got error from http request: SDN is down")
 			return nil, ErrSDNUnavailable
