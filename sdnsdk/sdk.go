@@ -709,15 +709,21 @@ func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, e
 			s.close(resp)
 		}
 	}()
-	switch method {
-	case http.MethodGet:
-		resp, err = client.Get(uri)
-	case http.MethodPost:
-		resp, err = client.Post(uri, "application/json", body)
-	}
+
+	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
 		return nil, err
 	}
+
+	if body != nil {
+		req.Header.Add("Content-Type", "application/json")
+	}
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if resp.StatusCode == http.StatusServiceUnavailable {
 			log.Debugf("got error from http request: SDN is down")
