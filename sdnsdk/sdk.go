@@ -72,6 +72,9 @@ type SDNHTTP interface {
 	GetQuotaUsage(accountID string) (*QuotaResponseBody, error)
 	FindNewRelay(ctx context.Context, oldRelayIP string, oldRelayIPPort int64, relayInstructions chan RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap)
+	SetInternalGateway(state *message.InternalGateway) error
+	AddInternalGatewaySubscription(accountID types.AccountID) error
+	RemoveInternalGatewaySubscription(accountID types.AccountID) error
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -706,16 +709,22 @@ func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, e
 			s.close(resp)
 		}
 	}()
-	switch method {
-	case http.MethodGet:
-		resp, err = client.Get(uri)
-	case http.MethodPost:
-		resp, err = client.Post(uri, "application/json", body)
-	}
+
+	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != 200 {
+
+	if body != nil {
+		req.Header.Add("Content-Type", "application/json")
+	}
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if resp.StatusCode == http.StatusServiceUnavailable {
 			log.Debugf("got error from http request: SDN is down")
 			return nil, ErrSDNUnavailable
@@ -848,6 +857,37 @@ func (s *realSDNHTTP) Networks() *message.BlockchainNetworks {
 // SetNetworks setter for the private networks field
 func (s *realSDNHTTP) SetNetworks(networks message.BlockchainNetworks) {
 	s.networks = networks
+}
+
+// SetInternalGateway updates the current internal gateway state. [for internal use only]
+func (s *realSDNHTTP) SetInternalGateway(state *message.InternalGateway) error {
+	url := fmt.Sprintf("%v/internal-gateways/%v", s.sdnURL, s.nodeID)
+	stateBytes, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("could not serialize internal gateway state: %w", err)
+	}
+	if _, err = s.http(url, http.MethodPost, bytes.NewBuffer(stateBytes)); err != nil {
+		return fmt.Errorf("could not send internal gateway state: %w", err)
+	}
+	return nil
+}
+
+// AddInternalGatewaySubscription tries to add an account subscription. [for internal use only]
+func (s *realSDNHTTP) AddInternalGatewaySubscription(accountID types.AccountID) error {
+	url := fmt.Sprintf("%v/internal-gateways/%v/subscriptions/%v", s.sdnURL, s.nodeID, accountID)
+	if _, err := s.http(url, http.MethodPost, nil); err != nil {
+		return fmt.Errorf("could not send request to add internal gateway subscription: %w", err)
+	}
+	return nil
+}
+
+// RemoveInternalGatewaySubscription removes an account subscription. [for internal use only]
+func (s *realSDNHTTP) RemoveInternalGatewaySubscription(accountID types.AccountID) error {
+	url := fmt.Sprintf("%v/internal-gateways/%v/subscriptions/%v", s.sdnURL, s.nodeID, accountID)
+	if _, err := s.http(url, http.MethodDelete, nil); err != nil {
+		return fmt.Errorf("could not send request to remove internal gateway subscription: %w", err)
+	}
+	return nil
 }
 
 var (
