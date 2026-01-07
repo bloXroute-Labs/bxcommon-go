@@ -40,7 +40,7 @@ const BSCChainID = 56
 
 const XLayerChainID = 196
 
-// HyperliquidChaind - Hyperliquicd chain ID
+// HyperliquidChainID - Hyperliquicd chain ID
 const HyperliquidChainID = 999
 
 const MonadChainID = 143
@@ -56,7 +56,7 @@ const BaseMainnetNum NetworkNum = 456
 
 const XLayerMainnetNum NetworkNum = 567
 
-// HyperliquidChaind - Hyperliquid network number (internal arbitrary, so we use same as chain id)
+// HyperliquidNum - Hyperliquid network number (internal arbitrary, so we use same as chain id)
 const HyperliquidNum NetworkNum = 999
 
 const MonadMainnetNum NetworkNum = 143
@@ -103,11 +103,8 @@ var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
 }
 
 var (
-	BSCMainnetLorentzTime = time.Date(2025, 4, 29, 5, 5, 0, 0, time.UTC)
-	BSCTestnetLorentzTime = time.Date(2025, 4, 8, 5, 5, 0, 0, time.UTC)
-	// TODO Update these times when Maxwell is activated on BSC Mainnet and BSC Testnet
-	BSCMainnetMaxwellTime time.Time
-	BSCTestnetMaxwellTime time.Time
+	BSCMainnetFermiTime = time.Date(2026, 1, 14, 2, 30, 0, 0, time.UTC)
+	BSCTestnetFermiTime = time.Date(2025, 11, 10, 2, 25, 0, 0, time.UTC)
 )
 
 // NetworkToBlockDuration defines block interval for each network
@@ -115,7 +112,15 @@ func NetworkToBlockDuration(network string) time.Duration {
 	switch network {
 	case Mainnet:
 		return 12 * time.Second
-	case BSCMainnet, BSCTestnet:
+	case BSCMainnet:
+		if time.Now().After(BSCMainnetFermiTime) {
+			return 450 * time.Millisecond
+		}
+		return 750 * time.Millisecond
+	case BSCTestnet:
+		if time.Now().After(BSCTestnetFermiTime) {
+			return 450 * time.Millisecond
+		}
 		return 750 * time.Millisecond
 	case Holesky:
 		return 12 * time.Second
