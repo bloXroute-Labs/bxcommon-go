@@ -273,6 +273,22 @@ type Account struct {
 	EthBundlePerSecond BDNQuotaService `json:"eth_bundle_per_second"`
 	BscBundlePerBlock  BDNQuotaService `json:"bsc_bundle_per_block"`
 	BscBundlePerSecond BDNQuotaService `json:"bsc_bundle_per_second"`
+
+	// Price restructure
+	ETHMempoolStreaming    BDNQuotaService `json:"eth_mempool_streaming"`
+	ETHBlocksStreaming     BDNQuotaService `json:"eth_blocks_streaming"`
+	ETHTXReceiptsStreaming BDNQuotaService `json:"eth_tx_receipts_streaming"`
+	ETHMevStreaming        BDNBasicService `json:"eth_mev_streaming"`
+	ETHBundleSimulation    BDNBasicService `json:"eth_bundle_simulation"`
+
+	BSCMempoolStreaming    BDNQuotaService `json:"bsc_mempool_streaming"`
+	BSCBlocksStreaming     BDNQuotaService `json:"bsc_blocks_streaming"`
+	BSCTXReceiptsStreaming BDNQuotaService `json:"bsc_tx_receipts_streaming"`
+	BSCBundleSimulation    BDNBasicService `json:"bsc_bundle_simulation"`
+	BSCBigBundles          BDNBasicService `json:"bsc_big_bundles"`
+	BSCBoosterNetwork      BDNBasicService `json:"bsc_booster_network"`
+
+	BaseBoosterNetwork BDNBasicService `json:"base_booster_network"`
 }
 
 // Validate verifies the response that the response from bxapi is well understood
