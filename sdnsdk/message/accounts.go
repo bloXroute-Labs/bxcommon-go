@@ -274,7 +274,7 @@ type Account struct {
 	BscBundlePerBlock  BDNQuotaService `json:"bsc_bundle_per_block"`
 	BscBundlePerSecond BDNQuotaService `json:"bsc_bundle_per_second"`
 
-	// Price restructure
+	// Pricing restructure
 	ETHMempoolStreaming    BDNQuotaService `json:"eth_mempool_streaming"`
 	ETHBlocksStreaming     BDNQuotaService `json:"eth_blocks_streaming"`
 	ETHTXReceiptsStreaming BDNQuotaService `json:"eth_tx_receipts_streaming"`
