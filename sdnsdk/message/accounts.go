@@ -244,12 +244,7 @@ type Account struct {
 	PrivateRelay                        BDNPrivateRelayService `json:"private_relays"`
 	PrivateTransaction                  BDNQuotaService        `json:"private_transaction"`
 	PrivateTransactionFee               BDNQuotaService        `json:"private_transaction_fee"`
-	OnlineGateways                      BDNQuotaService        `json:"online_gateways"`
-	OnlineSolanaGateways                BDNQuotaService        `json:"online_solana_gateways"`
-	SolanaTXStreamers                   BDNQuotaService        `json:"solana_tx_streamers"`
-	TxTraceRateLimit                    BDNQuotaService        `json:"tx_trace_rate_limitation"`
 	RelayLimit                          BDNQuotaService        `json:"relay_limit"`
-	MinAllowedNodes                     BDNQuotaService        `json:"min_allowed_nodes"`
 	MaxAllowedNodes                     BDNQuotaService        `json:"max_allowed_nodes"`
 	InboundNodeConnections              BDNQuotaService        `json:"inbound_node_connections"`
 
@@ -288,7 +283,23 @@ type Account struct {
 	BSCBigBundles          BDNBasicService `json:"bsc_big_bundles"`
 	BSCBoosterNetwork      BDNBasicService `json:"bsc_booster_network"`
 
-	BaseBoosterNetwork BDNBasicService `json:"base_booster_network"`
+	BaseFlashblocksStreaming       BDNBasicService `json:"base_flashblocks_streaming"`
+	BaseParsedFlashblocksStreaming BDNQuotaService `json:"base_parsed_flashblocks_streaming"`
+	BaseBoosterNetwork             BDNBasicService `json:"base_booster_network"`
+	BaseStateDiffStreaming         BDNQuotaService `json:"base_state_diff_streaming"`
+
+	OnlineSolanaGateways   BDNQuotaService `json:"online_solana_gateways"`
+	SolanaShreadStreams    BDNQuotaService `json:"solana_shread_streams"`
+	SolanaTXStreamers      BDNQuotaService `json:"solana_tx_streamers"`
+	SolanaTraderApiCredits BDNQuotaService `json:"solana_trader_api_credits"`
+
+	// TxTool
+	TxTraceRateLimit          BDNQuotaService `json:"tx_trace_rate_limitation"`
+	BundleTraceRateLimitation BDNQuotaService `json:"bundle_trace_rate_limitation"`
+
+	OnlineGateways    BDNQuotaService `json:"online_gateways"`
+	MinAllowedNodes   BDNQuotaService `json:"min_allowed_nodes"`
+	BDNPrivateRegions BDNBasicService `json:"bdn_private_regions"`
 }
 
 // Validate verifies the response that the response from bxapi is well understood
