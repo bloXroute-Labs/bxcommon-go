@@ -122,7 +122,7 @@ type RelayInstruction struct {
 // ConnInstructionType specifies connection or disconnection
 type ConnInstructionType int
 
-type quotaRequestBody struct {
+type QuotaRequestBody struct {
 	AccountID string `json:"account_id"`
 }
 
@@ -579,7 +579,7 @@ func (s *realSDNHTTP) close(resp *http.Response) {
 }
 
 func (s *realSDNHTTP) GetQuotaUsage(accountID string) (*QuotaResponseBody, error) {
-	reqBody := quotaRequestBody{
+	reqBody := QuotaRequestBody{
 		AccountID: accountID,
 	}
 	body, err := json.Marshal(reqBody)
