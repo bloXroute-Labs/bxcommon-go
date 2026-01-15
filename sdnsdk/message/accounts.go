@@ -294,7 +294,7 @@ type Account struct {
 	SolanaTraderApiCredits BDNQuotaService `json:"solana_trader_api_credits"`
 
 	// TxTool
-	TxTraceRateLimit          BDNQuotaService `json:"tx_trace_rate_limitation"`
+	TxTraceRateLimitation     BDNQuotaService `json:"tx_trace_rate_limitation"`
 	BundleTraceRateLimitation BDNQuotaService `json:"bundle_trace_rate_limitation"`
 
 	OnlineGateways    BDNQuotaService `json:"online_gateways"`
@@ -457,7 +457,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			},
 			ExpireDateTime: now.Add(time.Hour),
 		},
-		TxTraceRateLimit: BDNQuotaService{
+		TxTraceRateLimitation: BDNQuotaService{
 			MsgQuota: BDNService{
 				TimeInterval: TimeIntervalDaily,
 				ServiceType:  BDNServiceMsgQuota,
