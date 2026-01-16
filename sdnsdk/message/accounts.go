@@ -293,7 +293,7 @@ type Account struct {
 	BaseStateDiffStreaming         BDNQuotaService `json:"base_state_diff_streaming"`
 
 	OnlineSolanaGateways   BDNQuotaService `json:"online_solana_gateways"`
-	SolanaShreadStreams    BDNQuotaService `json:"solana_shread_streams"`
+	SolanaShredStreams     BDNQuotaService `json:"solana_shred_streams"`
 	SolanaTxStreamers      BDNQuotaService `json:"solana_tx_streamers"`
 	SolanaTraderApiCredits BDNQuotaService `json:"solana_trader_api_credits"`
 
