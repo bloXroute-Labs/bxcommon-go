@@ -166,6 +166,10 @@ func (i *BDNServiceLimit) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (bdnQS *BDNQuotaService) IsActive() bool {
+	return time.Now().Before(bdnQS.ExpireDateTime)
+}
+
 // UnmarshalJSON implements deserialization for BDNQuotaService type
 func (bdnQS *BDNQuotaService) UnmarshalJSON(b []byte) error {
 	qs := quotaService{
@@ -272,25 +276,25 @@ type Account struct {
 	// Pricing restructure
 	ETHMempoolStreaming    BDNQuotaService `json:"eth_mempool_streaming"`
 	ETHBlocksStreaming     BDNQuotaService `json:"eth_blocks_streaming"`
-	ETHTXReceiptsStreaming BDNQuotaService `json:"eth_tx_receipts_streaming"`
-	ETHMevStreaming        BDNBasicService `json:"eth_mev_streaming"`
-	ETHBundleSimulation    BDNBasicService `json:"eth_bundle_simulation"`
+	EthTxReceiptsStreaming BDNQuotaService `json:"eth_tx_receipts_streaming"`
+	EthMevStreaming        BDNBasicService `json:"eth_mev_streaming"`
+	EthBundleSimulation    BDNBasicService `json:"eth_bundle_simulation"`
 
-	BSCMempoolStreaming    BDNQuotaService `json:"bsc_mempool_streaming"`
-	BSCBlocksStreaming     BDNQuotaService `json:"bsc_blocks_streaming"`
-	BSCTXReceiptsStreaming BDNQuotaService `json:"bsc_tx_receipts_streaming"`
-	BSCBundleSimulation    BDNBasicService `json:"bsc_bundle_simulation"`
-	BSCBigBundles          BDNBasicService `json:"bsc_big_bundles"`
-	BSCBoosterNetwork      BDNBasicService `json:"bsc_booster_network"`
+	BscMempoolStreaming    BDNQuotaService `json:"bsc_mempool_streaming"`
+	BscBlocksStreaming     BDNQuotaService `json:"bsc_blocks_streaming"`
+	BscTxReceiptsStreaming BDNQuotaService `json:"bsc_tx_receipts_streaming"`
+	BscBundleSimulation    BDNBasicService `json:"bsc_bundle_simulation"`
+	BscBigBundles          BDNBasicService `json:"bsc_big_bundles"`
+	BscBoosterNetwork      BDNBasicService `json:"bsc_booster_network"`
 
-	BaseFlashblocksStreaming       BDNBasicService `json:"base_flashblocks_streaming"`
+	BaseFlashblocksStreaming       BDNQuotaService `json:"base_flashblocks_streaming"`
 	BaseParsedFlashblocksStreaming BDNQuotaService `json:"base_parsed_flashblocks_streaming"`
 	BaseBoosterNetwork             BDNBasicService `json:"base_booster_network"`
 	BaseStateDiffStreaming         BDNQuotaService `json:"base_state_diff_streaming"`
 
 	OnlineSolanaGateways   BDNQuotaService `json:"online_solana_gateways"`
 	SolanaShreadStreams    BDNQuotaService `json:"solana_shread_streams"`
-	SolanaTXStreamers      BDNQuotaService `json:"solana_tx_streamers"`
+	SolanaTxStreamers      BDNQuotaService `json:"solana_tx_streamers"`
 	SolanaTraderApiCredits BDNQuotaService `json:"solana_trader_api_credits"`
 
 	// TxTool
