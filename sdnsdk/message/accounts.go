@@ -166,6 +166,7 @@ func (i *BDNServiceLimit) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// IsActive indicates whether the BDNQuotaService is not expired
 func (bdnQS *BDNQuotaService) IsActive() bool {
 	return time.Now().Before(bdnQS.ExpireDateTime)
 }
@@ -217,7 +218,35 @@ type FeedProperties struct {
 
 // BDNBasicService is a placeholder for service model configs
 type BDNBasicService struct {
-	ExpireDate string `json:"expire_date"`
+	ExpireDate     string `json:"expire_date"`
+	ExpireDateTime time.Time
+}
+
+// IsActive indicates whether the BDNBasicService is not expired
+func (bdnbs *BDNBasicService) IsActive() bool {
+	return time.Now().Before(bdnbs.ExpireDateTime)
+}
+
+// UnmarshalJSON implements deserialization for BDNQuotaService type
+func (bdnbs *BDNBasicService) UnmarshalJSON(b []byte) error {
+	bs := BDNBasicService{
+		ExpireDate: types.ExpiredDate,
+	}
+	err := json.Unmarshal(b, &bs)
+	if err != nil {
+		return err
+	}
+	expireDateTime, err := time.Parse(types.TimeDateLayoutISO, bs.ExpireDate)
+	bdnbs.ExpireDateTime = expireDateTime
+	return nil
+}
+
+// MarshalJSON implements serialization for BDNQuotaService type
+func (bdnbs BDNBasicService) MarshalJSON() ([]byte, error) {
+	bs := BDNBasicService{
+		ExpireDate: bdnbs.ExpireDateTime.Format(types.TimeDateLayoutISO),
+	}
+	return json.Marshal(bs)
 }
 
 // BDNFeedService is a placeholder for service model configs
