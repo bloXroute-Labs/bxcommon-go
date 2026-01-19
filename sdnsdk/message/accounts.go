@@ -222,6 +222,10 @@ type BDNBasicService struct {
 	ExpireDateTime time.Time
 }
 
+type basicService struct {
+	ExpireDate string `json:"expire_date"`
+}
+
 // IsActive indicates whether the BDNBasicService is not expired
 func (bdnbs *BDNBasicService) IsActive() bool {
 	return time.Now().Before(bdnbs.ExpireDateTime)
@@ -229,7 +233,7 @@ func (bdnbs *BDNBasicService) IsActive() bool {
 
 // UnmarshalJSON implements deserialization for BDNQuotaService type
 func (bdnbs *BDNBasicService) UnmarshalJSON(b []byte) error {
-	bs := BDNBasicService{
+	bs := basicService{
 		ExpireDate: types.ExpiredDate,
 	}
 	err := json.Unmarshal(b, &bs)
@@ -243,7 +247,7 @@ func (bdnbs *BDNBasicService) UnmarshalJSON(b []byte) error {
 
 // MarshalJSON implements serialization for BDNQuotaService type
 func (bdnbs BDNBasicService) MarshalJSON() ([]byte, error) {
-	bs := BDNBasicService{
+	bs := basicService{
 		ExpireDate: bdnbs.ExpireDateTime.Format(types.TimeDateLayoutISO),
 	}
 	return json.Marshal(bs)
