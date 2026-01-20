@@ -131,6 +131,16 @@ const (
 	BehaviorAuditAlert BDNServiceBehaviorType = "AUDIT_ALERT"
 )
 
+// BDNMinAllowedNodesService represents a service model config for MinAllowedNodes
+type BDNMinAllowedNodesService struct {
+	BDNQuotaService
+}
+
+// IsActive indicates whether the BDNMinAllowedNodesService is not expired and limit is 0
+func (bdnmans BDNMinAllowedNodesService) IsActive() bool {
+	return time.Now().Before(bdnmans.ExpireDateTime) && bdnmans.MsgQuota.Limit == 0
+}
+
 // BDNService represents a service model config
 // This struct is roughly equivalent to 'BdnServiceModel' in Python
 type BDNService struct {
@@ -337,9 +347,11 @@ type Account struct {
 	TxTraceRateLimitation     BDNQuotaService `json:"tx_trace_rate_limitation"`
 	BundleTraceRateLimitation BDNQuotaService `json:"bundle_trace_rate_limitation"`
 
-	OnlineGateways    BDNQuotaService `json:"online_gateways"`
-	MinAllowedNodes   BDNQuotaService `json:"min_allowed_nodes"`
-	BDNPrivateRegions BDNBasicService `json:"bdn_private_regions"`
+	OnlineGateways    BDNQuotaService           `json:"online_gateways"`
+	MinAllowedNodes   BDNMinAllowedNodesService `json:"min_allowed_nodes"`
+	BDNPrivateRegions BDNBasicService           `json:"bdn_private_regions"`
+
+	IsPaidAccount bool
 }
 
 func (a *Account) paidServices() []ActiveService {
@@ -372,8 +384,12 @@ func (a *Account) paidServices() []ActiveService {
 
 // IsPaid indicates whether the account has any paid services active
 func (a *Account) IsPaid() bool {
+	if a.IsPaidAccount {
+		return true
+	}
 	for _, service := range a.paidServices() {
 		if service.IsActive() {
+			a.IsPaidAccount = true
 			return true
 		}
 	}
@@ -784,12 +800,14 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			},
 			ExpireDateTime: now.Add(time.Hour),
 		},
-		MinAllowedNodes: BDNQuotaService{
-			MsgQuota: BDNService{
-				ServiceType: BDNServicePermit,
-				Limit:       0,
+		MinAllowedNodes: BDNMinAllowedNodesService{
+			BDNQuotaService: BDNQuotaService{
+				MsgQuota: BDNService{
+					ServiceType: BDNServicePermit,
+					Limit:       0,
+				},
+				ExpireDateTime: now.Add(time.Hour),
 			},
-			ExpireDateTime: now.Add(time.Hour),
 		},
 		BDNPrivateRegions: BDNBasicService{
 			ExpireDateTime: now.Add(time.Hour),
