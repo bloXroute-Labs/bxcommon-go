@@ -351,7 +351,7 @@ type Account struct {
 	MinAllowedNodes   BDNMinAllowedNodesService `json:"min_allowed_nodes"`
 	BDNPrivateRegions BDNBasicService           `json:"bdn_private_regions"`
 
-	IsPaidAccount bool
+	isPaidAccount bool
 }
 
 func (a *Account) paidServices() []ActiveService {
@@ -384,12 +384,12 @@ func (a *Account) paidServices() []ActiveService {
 
 // IsPaid indicates whether the account has any paid services active
 func (a *Account) IsPaid() bool {
-	if a.IsPaidAccount {
+	if a.isPaidAccount {
 		return true
 	}
 	for _, service := range a.paidServices() {
 		if service.IsActive() {
-			a.IsPaidAccount = true
+			a.isPaidAccount = true
 			return true
 		}
 	}
