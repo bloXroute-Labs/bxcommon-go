@@ -373,7 +373,6 @@ func (a *Account) paidServices() []ActiveService {
 		&a.OnlineSolanaGateways,
 		&a.SolanaShredStreams,
 		&a.SolanaTxStreamers,
-		&a.SolanaTraderApiCredits,
 		&a.TxTraceRateLimitation,
 		&a.BundleTraceRateLimitation,
 		&a.OnlineGateways,
