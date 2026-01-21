@@ -351,7 +351,7 @@ type Account struct {
 	MinAllowedNodes   BDNMinAllowedNodesService `json:"min_allowed_nodes"`
 	BDNPrivateRegions BDNBasicService           `json:"bdn_private_regions"`
 
-	isPaidAccount bool
+	isPaidAccount *bool
 }
 
 func (a *Account) paidServices() []ActiveService {
@@ -384,16 +384,20 @@ func (a *Account) paidServices() []ActiveService {
 
 // IsPaid indicates whether the account has any paid services active
 func (a *Account) IsPaid() bool {
-	if a.isPaidAccount {
-		return true
+	if a.isPaidAccount != nil {
+		return *a.isPaidAccount
 	}
+
+	paid := false
 	for _, service := range a.paidServices() {
 		if service.IsActive() {
-			a.isPaidAccount = true
-			return true
+			paid = true
+			break
 		}
 	}
-	return false
+
+	a.isPaidAccount = &paid
+	return paid
 }
 
 // Validate verifies the response that the response from bxapi is well understood
