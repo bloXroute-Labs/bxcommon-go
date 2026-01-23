@@ -131,6 +131,16 @@ const (
 	BehaviorAuditAlert BDNServiceBehaviorType = "AUDIT_ALERT"
 )
 
+// BDNMinAllowedNodesService represents a service model config for MinAllowedNodes
+type BDNMinAllowedNodesService struct {
+	BDNQuotaService
+}
+
+// IsActive indicates whether the BDNMinAllowedNodesService is not expired and limit is 0
+func (bdnmans BDNMinAllowedNodesService) IsActive() bool {
+	return time.Now().Before(bdnmans.ExpireDateTime) && bdnmans.MsgQuota.Limit == 0
+}
+
 // BDNService represents a service model config
 // This struct is roughly equivalent to 'BdnServiceModel' in Python
 type BDNService struct {
@@ -164,6 +174,11 @@ func (i *BDNServiceLimit) UnmarshalJSON(b []byte) error {
 	}
 	*i = BDNServiceLimit(limit)
 	return nil
+}
+
+// IsActive indicates whether the BDNQuotaService is not expired and has quota left
+func (bdnQS BDNQuotaService) IsActive() bool {
+	return time.Now().Before(bdnQS.ExpireDateTime) && bdnQS.MsgQuota.Limit > 0
 }
 
 // UnmarshalJSON implements deserialization for BDNQuotaService type
@@ -213,7 +228,39 @@ type FeedProperties struct {
 
 // BDNBasicService is a placeholder for service model configs
 type BDNBasicService struct {
+	ExpireDate     string
+	ExpireDateTime time.Time
+}
+
+type basicService struct {
 	ExpireDate string `json:"expire_date"`
+}
+
+// IsActive indicates whether the BDNBasicService is not expired
+func (bdnbs BDNBasicService) IsActive() bool {
+	return time.Now().Before(bdnbs.ExpireDateTime)
+}
+
+// UnmarshalJSON implements deserialization for BDNQuotaService type
+func (bdnbs *BDNBasicService) UnmarshalJSON(b []byte) error {
+	bs := basicService{
+		ExpireDate: types.ExpiredDate,
+	}
+	err := json.Unmarshal(b, &bs)
+	if err != nil {
+		return err
+	}
+	expireDateTime, err := time.Parse(types.TimeDateLayoutISO, bs.ExpireDate)
+	bdnbs.ExpireDateTime = expireDateTime
+	return nil
+}
+
+// MarshalJSON implements serialization for BDNQuotaService type
+func (bdnbs BDNBasicService) MarshalJSON() ([]byte, error) {
+	bs := basicService{
+		ExpireDate: bdnbs.ExpireDateTime.Format(types.TimeDateLayoutISO),
+	}
+	return json.Marshal(bs)
 }
 
 // BDNFeedService is a placeholder for service model configs
@@ -225,6 +272,10 @@ type BDNFeedService struct {
 
 // BDNPrivateRelayService is a placeholder for service model configs
 type BDNPrivateRelayService interface{}
+
+type ActiveService interface {
+	IsActive() bool
+}
 
 // Account represents the account structure fetched from bxapi
 type Account struct {
@@ -244,12 +295,7 @@ type Account struct {
 	PrivateRelay                        BDNPrivateRelayService `json:"private_relays"`
 	PrivateTransaction                  BDNQuotaService        `json:"private_transaction"`
 	PrivateTransactionFee               BDNQuotaService        `json:"private_transaction_fee"`
-	OnlineGateways                      BDNQuotaService        `json:"online_gateways"`
-	OnlineSolanaGateways                BDNQuotaService        `json:"online_solana_gateways"`
-	SolanaTXStreamers                   BDNQuotaService        `json:"solana_tx_streamers"`
-	TxTraceRateLimit                    BDNQuotaService        `json:"tx_trace_rate_limitation"`
 	RelayLimit                          BDNQuotaService        `json:"relay_limit"`
-	MinAllowedNodes                     BDNQuotaService        `json:"min_allowed_nodes"`
 	MaxAllowedNodes                     BDNQuotaService        `json:"max_allowed_nodes"`
 	InboundNodeConnections              BDNQuotaService        `json:"inbound_node_connections"`
 
@@ -273,6 +319,37 @@ type Account struct {
 	EthBundlePerSecond BDNQuotaService `json:"eth_bundle_per_second"`
 	BscBundlePerBlock  BDNQuotaService `json:"bsc_bundle_per_block"`
 	BscBundlePerSecond BDNQuotaService `json:"bsc_bundle_per_second"`
+
+	// Pricing restructure
+	EthMempoolStreaming BDNQuotaService `json:"eth_mempool_streaming"`
+	EthBlocksStreaming  BDNQuotaService `json:"eth_blocks_streaming"`
+	EthMevStreaming     BDNBasicService `json:"eth_mev_streaming"`
+	EthBundleSimulation BDNBasicService `json:"eth_bundle_simulation"`
+
+	BscMempoolStreaming    BDNQuotaService `json:"bsc_mempool_streaming"`
+	BscBlocksStreaming     BDNQuotaService `json:"bsc_blocks_streaming"`
+	BscTxReceiptsStreaming BDNQuotaService `json:"bsc_tx_receipts_streaming"`
+	BscBundleSimulation    BDNBasicService `json:"bsc_bundle_simulation"`
+	BscBigBundles          BDNBasicService `json:"bsc_big_bundles"`
+	BscBoosterNetwork      BDNBasicService `json:"bsc_booster_network"`
+
+	BaseFlashblocksStreaming       BDNQuotaService `json:"base_flashblocks_streaming"`
+	BaseParsedFlashblocksStreaming BDNQuotaService `json:"base_parsed_flashblocks_streaming"`
+	BaseBoosterNetwork             BDNBasicService `json:"base_booster_network"`
+	BaseStateDiffStreaming         BDNQuotaService `json:"base_state_diff_streaming"`
+
+	OnlineSolanaGateways   BDNQuotaService `json:"online_solana_gateways"`
+	SolanaShredStreams     BDNQuotaService `json:"solana_shred_streams"`
+	SolanaTxStreamers      BDNQuotaService `json:"solana_tx_streamers"`
+	SolanaTraderApiCredits BDNQuotaService `json:"solana_trader_api_credits"`
+
+	// TxTool
+	TxTraceRateLimitation     BDNQuotaService `json:"tx_trace_rate_limitation"`
+	BundleTraceRateLimitation BDNQuotaService `json:"bundle_trace_rate_limitation"`
+
+	OnlineGateways    BDNQuotaService           `json:"online_gateways"`
+	MinAllowedNodes   BDNMinAllowedNodesService `json:"min_allowed_nodes"`
+	BDNPrivateRegions BDNBasicService           `json:"bdn_private_regions"`
 }
 
 // Validate verifies the response that the response from bxapi is well understood
@@ -422,22 +499,6 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			},
 			ExpireDateTime: now.Add(time.Hour),
 		},
-		OnlineGateways: BDNQuotaService{
-			MsgQuota: BDNService{
-				TimeInterval: TimeIntervalDaily,
-				ServiceType:  BDNServiceMsgQuota,
-				Limit:        1,
-			},
-			ExpireDateTime: now.Add(time.Hour),
-		},
-		TxTraceRateLimit: BDNQuotaService{
-			MsgQuota: BDNService{
-				TimeInterval: TimeIntervalDaily,
-				ServiceType:  BDNServiceMsgQuota,
-				Limit:        1,
-			},
-			ExpireDateTime: now.Add(time.Hour),
-		},
 		UnpaidTransactionBurstLimit: BDNQuotaService{
 			MsgQuota: BDNService{
 				ServiceType:       BDNServiceMsgQuota,
@@ -463,13 +524,6 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			MsgQuota: BDNService{
 				ServiceType: BDNServicePermit,
 				Limit:       2,
-			},
-			ExpireDateTime: now.Add(time.Hour),
-		},
-		MinAllowedNodes: BDNQuotaService{
-			MsgQuota: BDNService{
-				ServiceType: BDNServicePermit,
-				Limit:       0,
 			},
 			ExpireDateTime: now.Add(time.Hour),
 		},
@@ -533,6 +587,186 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				TimeInterval: TimeIntervalWithout,
 				Limit:        15,
 			},
+		},
+		EthMempoolStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             20,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		EthBlocksStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             20,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		EthMevStreaming: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		EthBundleSimulation: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
+		},
+
+		BscMempoolStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             20,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BscBlocksStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             20,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BscTxReceiptsStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             20,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour)},
+		BscBundleSimulation: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BscBigBundles: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BscBoosterNetwork: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
+		},
+
+		BaseFlashblocksStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             3,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BaseParsedFlashblocksStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             3,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BaseBoosterNetwork: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BaseStateDiffStreaming: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             3,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+
+		OnlineSolanaGateways: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             5,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		SolanaShredStreams: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             5,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		SolanaTxStreamers: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             5,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		SolanaTraderApiCredits: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             3000,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+
+		TxTraceRateLimitation: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval: TimeIntervalDaily,
+				ServiceType:  BDNServiceMsgQuota,
+				Limit:        1,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		BundleTraceRateLimitation: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval:      TimeIntervalDaily,
+				ServiceType:       BDNServiceMsgQuota,
+				Limit:             60,
+				BehaviorLimitOK:   BehaviorNoAction,
+				BehaviorLimitFail: BehaviorNoAction,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+
+		OnlineGateways: BDNQuotaService{
+			MsgQuota: BDNService{
+				TimeInterval: TimeIntervalDaily,
+				ServiceType:  BDNServiceMsgQuota,
+				Limit:        1,
+			},
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		MinAllowedNodes: BDNMinAllowedNodesService{
+			BDNQuotaService: BDNQuotaService{
+				MsgQuota: BDNService{
+					ServiceType: BDNServicePermit,
+					Limit:       0,
+				},
+				ExpireDateTime: now.Add(time.Hour),
+			},
+		},
+		BDNPrivateRegions: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
 		},
 	}
 
