@@ -321,8 +321,8 @@ type Account struct {
 	BscBundlePerSecond BDNQuotaService `json:"bsc_bundle_per_second"`
 
 	// Pricing restructure
-	ETHMempoolStreaming BDNQuotaService `json:"eth_mempool_streaming"`
-	ETHBlocksStreaming  BDNQuotaService `json:"eth_blocks_streaming"`
+	EthMempoolStreaming BDNQuotaService `json:"eth_mempool_streaming"`
+	EthBlocksStreaming  BDNQuotaService `json:"eth_blocks_streaming"`
 	EthMevStreaming     BDNBasicService `json:"eth_mev_streaming"`
 	EthBundleSimulation BDNBasicService `json:"eth_bundle_simulation"`
 
@@ -350,53 +350,6 @@ type Account struct {
 	OnlineGateways    BDNQuotaService           `json:"online_gateways"`
 	MinAllowedNodes   BDNMinAllowedNodesService `json:"min_allowed_nodes"`
 	BDNPrivateRegions BDNBasicService           `json:"bdn_private_regions"`
-
-	isPaidAccount *bool
-}
-
-func (a *Account) paidServices() []ActiveService {
-	return []ActiveService{
-		&a.ETHMempoolStreaming,
-		&a.ETHBlocksStreaming,
-		&a.EthMevStreaming,
-		&a.EthBundleSimulation,
-		&a.BscMempoolStreaming,
-		&a.BscBlocksStreaming,
-		&a.BscTxReceiptsStreaming,
-		&a.BscBundleSimulation,
-		&a.BscBigBundles,
-		&a.BscBoosterNetwork,
-		&a.BaseFlashblocksStreaming,
-		&a.BaseParsedFlashblocksStreaming,
-		&a.BaseBoosterNetwork,
-		&a.BaseStateDiffStreaming,
-		&a.OnlineSolanaGateways,
-		&a.SolanaShredStreams,
-		&a.SolanaTxStreamers,
-		&a.TxTraceRateLimitation,
-		&a.BundleTraceRateLimitation,
-		&a.OnlineGateways,
-		&a.MinAllowedNodes,
-		&a.BDNPrivateRegions,
-	}
-}
-
-// IsPaid indicates whether the account has any paid services active
-func (a *Account) IsPaid() bool {
-	if a.isPaidAccount != nil {
-		return *a.isPaidAccount
-	}
-
-	paid := false
-	for _, service := range a.paidServices() {
-		if service.IsActive() {
-			paid = true
-			break
-		}
-	}
-
-	a.isPaidAccount = &paid
-	return paid
 }
 
 // Validate verifies the response that the response from bxapi is well understood
@@ -635,7 +588,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				Limit:        15,
 			},
 		},
-		ETHMempoolStreaming: BDNQuotaService{
+		EthMempoolStreaming: BDNQuotaService{
 			MsgQuota: BDNService{
 				TimeInterval:      TimeIntervalDaily,
 				ServiceType:       BDNServiceMsgQuota,
@@ -645,7 +598,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			},
 			ExpireDateTime: now.Add(time.Hour),
 		},
-		ETHBlocksStreaming: BDNQuotaService{
+		EthBlocksStreaming: BDNQuotaService{
 			MsgQuota: BDNService{
 				TimeInterval:      TimeIntervalDaily,
 				ServiceType:       BDNServiceMsgQuota,
