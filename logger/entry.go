@@ -112,3 +112,8 @@ func (entry *Entry) Error(args ...interface{}) {
 func (entry *Entry) Fatalf(format string, args ...interface{}) {
 	entry.ee.Fatal().Msgf(format, args...)
 }
+
+// Zerolog returns a copy of the zerolog.Logger used by this Entry.
+func (entry *Entry) Zerolog() zerolog.Logger {
+	return entry.ee
+}
