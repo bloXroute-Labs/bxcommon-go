@@ -321,10 +321,11 @@ type Account struct {
 	BscBundlePerSecond BDNQuotaService `json:"bsc_bundle_per_second"`
 
 	// Pricing restructure
-	EthMempoolStreaming BDNQuotaService `json:"eth_mempool_streaming"`
-	EthBlocksStreaming  BDNQuotaService `json:"eth_blocks_streaming"`
-	EthMevStreaming     BDNBasicService `json:"eth_mev_streaming"`
-	EthBundleSimulation BDNBasicService `json:"eth_bundle_simulation"`
+	EthMempoolStreaming    BDNQuotaService `json:"eth_mempool_streaming"`
+	EthBlocksStreaming     BDNQuotaService `json:"eth_blocks_streaming"`
+	EthTxReceiptsStreaming BDNQuotaService `json:"eth_tx_receipts_streaming"`
+	EthMevStreaming        BDNBasicService `json:"eth_mev_streaming"`
+	EthBundleSimulation    BDNBasicService `json:"eth_bundle_simulation"`
 
 	BscMempoolStreaming    BDNQuotaService `json:"bsc_mempool_streaming"`
 	BscBlocksStreaming     BDNQuotaService `json:"bsc_blocks_streaming"`
@@ -643,7 +644,8 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDateTime: now.Add(time.Hour)},
+			ExpireDateTime: now.Add(time.Hour),
+		},
 		BscBundleSimulation: BDNBasicService{
 			ExpireDateTime: now.Add(time.Hour),
 		},
@@ -769,5 +771,4 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			ExpireDateTime: now.Add(time.Hour),
 		},
 	}
-
 }
