@@ -358,7 +358,7 @@ func (s realSDNHTTP) getAutoConnectedRelays(ignoredRelays IgnoredRelaysMap) map[
 }
 
 func (s realSDNHTTP) findFastestAvailableRelays(pingLatencies []nodeLatencyInfo, connectedAutoRelays map[string]types.RelayInfo) []nodeLatencyInfo {
-	var fastestAvailableRelays = make([]nodeLatencyInfo, 0)
+	fastestAvailableRelays := make([]nodeLatencyInfo, 0)
 
 	for _, pingLatency := range pingLatencies {
 		info, exists := connectedAutoRelays[pingLatency.IP]
@@ -631,7 +631,6 @@ func (s *realSDNHTTP) getAccountModelWithEndpoint(accountID types.AccountID, end
 func (s *realSDNHTTP) fillInAccountDefaults(accountModel *message.Account, now time.Time) (message.Account, error) {
 	mappedAccountModel := message.GetDefaultEliteAccount(now)
 	err := copier.CopyWithOption(&mappedAccountModel, *accountModel, copier.Option{IgnoreEmpty: true, DeepCopy: true})
-
 	if err != nil {
 		return *accountModel, err
 	}
@@ -645,11 +644,6 @@ func (s *realSDNHTTP) getAccountModel(accountID types.AccountID) error {
 	if s.accountModel.RelayLimit.MsgQuota.Limit == 0 {
 		log.Warnf("relay limit was set to 0, setting to 1")
 		s.accountModel.RelayLimit.MsgQuota.Limit = 1
-	}
-
-	if s.accountModel.MaxAllowedNodes.MsgQuota.Limit == 0 {
-		log.Warnf("relay max allowed nodes limit was set to 0, setting to 6")
-		s.accountModel.MaxAllowedNodes.MsgQuota.Limit = 6
 	}
 
 	return err
@@ -748,7 +742,6 @@ func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, e
 	b, errMsg := io.ReadAll(resp.Body)
 	if errMsg != nil {
 		return nil, fmt.Errorf("%v on %v could not read response %v, error %v", method, uri, resp.Status, errMsg.Error())
-
 	}
 	return b, nil
 }
