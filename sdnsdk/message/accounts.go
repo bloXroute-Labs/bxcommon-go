@@ -388,6 +388,7 @@ type AccountInfo struct {
 	Miner              bool            `json:"is_miner"`
 	Untrusted          bool            `json:"untrusted"`
 	MEVBuilders        []string        `json:"mev_builders"`
+	Grade              int             `json:"grade"`
 }
 
 // IsTrusted indicates whether the account is trusted
