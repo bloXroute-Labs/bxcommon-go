@@ -630,7 +630,7 @@ func (s *realSDNHTTP) getAccountModelWithEndpoint(accountID types.AccountID, end
 
 func (s *realSDNHTTP) fillInAccountDefaults(accountModel *message.Account, now time.Time) (message.Account, error) {
 	mappedAccountModel := message.GetDefaultEliteAccount(now)
-	err := copier.CopyWithOption(&mappedAccountModel, *accountModel, copier.Option{IgnoreEmpty: true, DeepCopy: true})
+	err := copier.CopyWithOption(&mappedAccountModel, *accountModel, copier.Option{DeepCopy: true})
 	if err != nil {
 		return *accountModel, err
 	}
