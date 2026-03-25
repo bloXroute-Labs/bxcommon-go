@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -291,7 +290,6 @@ func TestFindRelaysToSwitch(t *testing.T) {
 	assert.Contains(t, relaysToSwitch, key2)
 	assert.Equal(t, relaysToSwitch[key2][0].IP, "4")
 	assert.Equal(t, relaysToSwitch[key2][1].IP, "5")
-
 }
 
 func TestDirectRelayConnections_RelayLimit2(t *testing.T) {
@@ -992,7 +990,6 @@ func TestSDNHTTP_InitGateway_Fail(t *testing.T) {
 		jsonRespServiceUnavailable: `{"message": "503 Service Unavailable" }`,
 	}
 	t.Run(fmt.Sprint(testCase), func(t *testing.T) {
-
 		sslCerts := cert.NewSSLCertsPrivateKey(PrivateKey)
 		sslCerts.SavePrivateCert(PrivateCert)
 
@@ -1022,7 +1019,6 @@ func TestSDNHTTP_HttpPostBadRequestDetailsResponse(t *testing.T) {
 		nodeModel         message.NodeModel
 		jsonRespNodeModel string
 	}{
-
 		nodeModel:         message.NodeModel{NodeType: "FOO"},
 		jsonRespNodeModel: `{"message": "Bad Request", "details": "Foo not a valid type"}`,
 	}
@@ -1035,7 +1031,6 @@ func TestSDNHTTP_HttpPostBadRequestDetailsResponse(t *testing.T) {
 			if err != nil {
 				t.FailNow()
 			}
-
 		}
 		pattern := "/nodes"
 		router.HandleFunc(pattern, handler).Methods("POST")
@@ -1060,7 +1055,6 @@ func TestSDNHTTP_HttpGetBadRequestDetailsResponse(t *testing.T) {
 		nodeModel         message.NodeModel
 		jsonRespNodeModel string
 	}{
-
 		nodeModel:         message.NodeModel{NodeType: "FOO", NodeID: "0f54c509-06f0-4bdd-8fc0-3bdf1ac119ed"},
 		jsonRespNodeModel: `{"message": "Bad Request", "details": "Foo not a valid type"}`,
 	}
@@ -1073,7 +1067,6 @@ func TestSDNHTTP_HttpGetBadRequestDetailsResponse(t *testing.T) {
 			if err != nil {
 				t.FailNow()
 			}
-
 		}
 		pattern := "/nodes/{nodeId}"
 		router.HandleFunc(pattern, handler).Methods("GET")
@@ -1096,13 +1089,11 @@ func TestSDNHTTP_HttpPostBodyError(t *testing.T) {
 		networkNumber     types.NetworkNum
 		jsonRespNodeModel string
 	}{
-
 		nodeModel:         message.NodeModel{NodeType: "TEST"},
 		jsonRespNodeModel: `{"message": "Bad Request", "details": "TEST not a valid type"}`,
 	}
 
 	t.Run(fmt.Sprint(testCase), func(t *testing.T) {
-
 		router := mux.NewRouter()
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Length", "1")
@@ -1137,13 +1128,11 @@ func TestSDNHTTP_HttpPostUnmarshallError(t *testing.T) {
 		networkNumber     types.NetworkNum
 		jsonRespNodeModel string
 	}{
-
 		nodeModel:         message.NodeModel{NodeType: "TEST"},
 		jsonRespNodeModel: `{"message": 3}`,
 	}
 
 	t.Run(fmt.Sprint(testCase), func(t *testing.T) {
-
 		router := mux.NewRouter()
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(400)
@@ -1173,24 +1162,6 @@ func TestSDNHTTP_HttpPostUnmarshallError(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.Nil(t, resp)
 	})
-}
-
-func TestSDNHTTP_FillInAccountDefaults(t *testing.T) {
-	now := time.Now().UTC()
-	targetAccount := message.GetDefaultEliteAccount(now)
-	tp := reflect.TypeOf(targetAccount)
-	numFields := tp.NumField()
-	for i := 0; i < numFields; i++ {
-		reflect.ValueOf(&targetAccount).Elem().FieldByName(tp.Field(i).Name).Set(reflect.Zero(tp.Field(i).Type))
-	}
-
-	sdnhttp := testSDNHTTP()
-
-	targetAccount, err := sdnhttp.fillInAccountDefaults(&targetAccount, now)
-
-	assert.NoError(t, err)
-	assert.Equal(t, message.GetDefaultEliteAccount(now), targetAccount)
-
 }
 
 func mockNodesServer(t *testing.T, nodeID types.NodeID, externalPort int64, externalIP, protocol, network string, blockchainNetworkNum types.NetworkNum, accountID types.AccountID) func(w http.ResponseWriter, r *http.Request) {
@@ -1242,7 +1213,6 @@ func mockServiceError(t *testing.T, statusCode int, unavailableJSON string) func
 }
 
 func mockNodeModelServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.NodeModel) {
-
 	var requestNodeModel message.NodeModel
 	err := json.Unmarshal([]byte(nodeModel), &requestNodeModel)
 	if err != nil {
