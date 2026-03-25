@@ -25,7 +25,6 @@ import (
 	log "github.com/bloXroute-Labs/bxcommon-go/logger"
 	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
 	"github.com/bloXroute-Labs/bxcommon-go/types"
-	"github.com/jinzhu/copier"
 )
 
 var (
@@ -625,17 +624,7 @@ func (s *realSDNHTTP) getAccountModelWithEndpoint(accountID types.AccountID, end
 		return accountModel, fmt.Errorf("could not deserialize '%s' response into account model: %v", string(resp), err)
 	}
 
-	return s.fillInAccountDefaults(&accountModel, time.Now().UTC())
-}
-
-func (s *realSDNHTTP) fillInAccountDefaults(accountModel *message.Account, now time.Time) (message.Account, error) {
-	mappedAccountModel := message.GetDefaultEliteAccount(now)
-	err := copier.CopyWithOption(&mappedAccountModel, *accountModel, copier.Option{DeepCopy: true})
-	if err != nil {
-		return *accountModel, err
-	}
-
-	return mappedAccountModel, err
+	return accountModel, nil
 }
 
 func (s *realSDNHTTP) getAccountModel(accountID types.AccountID) error {
