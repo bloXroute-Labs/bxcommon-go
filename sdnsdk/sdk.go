@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,6 +44,7 @@ const (
 	accountModelsFileName           = "accountmodel.json"
 	httpTimeout                     = 10 * time.Second
 	latencyThreshold                = 10
+	privateCertRenewalPeriodDays    = 180
 )
 
 // SDNHTTP is the interface for realSDNHTTP type
@@ -74,6 +74,7 @@ type SDNHTTP interface {
 	SetInternalGateway(state *message.InternalGateway) error
 	AddInternalGatewaySubscription(accountID types.AccountID) error
 	RemoveInternalGatewaySubscription(accountID types.AccountID) error
+	RotateCertificate(ctx context.Context) error
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -193,6 +194,9 @@ func (s *realSDNHTTP) Get(endpoint string, requestBody []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	defer s.close(resp)
+
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -242,6 +246,42 @@ func (s *realSDNHTTP) InitGateway(protocol string, network string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// RotateCertificate checks if the private certificate is expiring within the renewal period and rotates it if needed
+func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
+	expDate, err := s.sslCerts.PrivateCertExpirationDate()
+	if err != nil {
+		return fmt.Errorf("could not get private certificate expiration date: %v", err)
+	}
+
+	if time.Until(expDate) > privateCertRenewalPeriodDays*24*time.Hour {
+		return nil
+	}
+
+	log.Infof("private certificate expiring on %v, rotating certificate", expDate)
+
+	csr, err := s.sslCerts.CreateCSR()
+	if err != nil {
+		return fmt.Errorf("could not create csr for new private certificate: %v", err)
+	}
+
+	s.nodeModel.Csr = string(csr)
+
+	resp, err := s.httpWithCacheAndContext(ctx, s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, bytes.NewBuffer(s.nodeModel.Pack()))
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(resp, &s.nodeModel); err != nil {
+		return fmt.Errorf("could not deserialize '%s' response into node model: %w", string(resp), err)
+	}
+
+	err = s.sslCerts.SavePrivateCert(s.nodeModel.Cert)
+	if err != nil {
+		return fmt.Errorf("could not save new private certificate: %w", err)
+	}
+
 	return nil
 }
 
@@ -554,14 +594,20 @@ func (s *realSDNHTTP) Register() error {
 	s.accountID = accountID
 
 	if s.sslCerts.NeedsPrivateCert() {
-		err := s.sslCerts.SavePrivateCert(s.nodeModel.Cert)
-		// should pretty much never happen unless there are SDN problems, in which
-		// case just abort on startup
-		if err != nil {
-			debug.PrintStack()
-			panic(err)
+		// first, check if the SDN returned the cert
+		if s.nodeModel.Cert != "" {
+			err = s.sslCerts.SavePrivateCert(s.nodeModel.Cert)
+			// should pretty much never happen unless there are SDN problems, in which
+			// case just abort on startup
+			if err != nil {
+				debug.PrintStack()
+				panic(err)
+			}
 		}
+
+		return nil
 	}
+
 	return nil
 }
 
@@ -613,7 +659,7 @@ func (s *realSDNHTTP) getAccountModelWithEndpoint(accountID types.AccountID, end
 	case "account":
 		resp, err = s.httpWithCache(url, http.MethodGet, accountModelsFileName, nil)
 	default:
-		log.Panicf("getAccountModelWithEndpoint called with unsuppored endpoint %v", endpoint)
+		log.Panicf("getAccountModelWithEndpoint called with unsupported endpoint %v", endpoint)
 	}
 
 	if err != nil {
@@ -658,8 +704,12 @@ func (s *realSDNHTTP) getRelays(nodeID types.NodeID, networkNum types.NetworkNum
 }
 
 func (s *realSDNHTTP) httpWithCache(uri string, method string, fileName string, body io.Reader) ([]byte, error) {
+	return s.httpWithCacheAndContext(context.Background(), uri, method, fileName, body)
+}
+
+func (s *realSDNHTTP) httpWithCacheAndContext(ctx context.Context, uri string, method string, fileName string, body io.Reader) ([]byte, error) {
 	var err error
-	data, httpErr := s.http(uri, method, body)
+	data, httpErr := s.httpWithContext(ctx, uri, method, body)
 	if httpErr != nil {
 		if errors.Is(httpErr, ErrSDNUnavailable) {
 			// we can't get the data from http - try to read from cache file
@@ -682,6 +732,10 @@ func (s *realSDNHTTP) httpWithCache(uri string, method string, fileName string, 
 }
 
 func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, error) {
+	return s.httpWithContext(context.Background(), uri, method, body)
+}
+
+func (s *realSDNHTTP) httpWithContext(ctx context.Context, uri string, method string, body io.Reader) ([]byte, error) {
 	client, err := s.httpClient()
 	if err != nil {
 		return nil, err
@@ -693,7 +747,7 @@ func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, e
 		}
 	}()
 
-	req, err := http.NewRequest(method, uri, body)
+	req, err := http.NewRequestWithContext(ctx, method, uri, body)
 	if err != nil {
 		return nil, err
 	}
@@ -876,18 +930,3 @@ var (
 	errAuthHeaderNotBase65   = errors.New("auth header is not base64 encoded")
 	errAuthHeaderWrongFormat = errors.New("account_id and hash could not be generated from auth header")
 )
-
-// GetAccountIDSecretHashFromHeader extracts accountID and secret values from an authorization header
-func GetAccountIDSecretHashFromHeader(authHeader string) (types.AccountID, string, error) {
-	payload, err := base64.StdEncoding.DecodeString(authHeader)
-	if err != nil {
-		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderNotBase65, authHeader)
-	}
-	accountIDAndHash := strings.SplitN(string(payload), ":", 2)
-	if len(accountIDAndHash) <= 1 {
-		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderWrongFormat, authHeader)
-	}
-	accountID := types.AccountID(accountIDAndHash[0])
-	secretHash := accountIDAndHash[1]
-	return accountID, secretHash, nil
-}

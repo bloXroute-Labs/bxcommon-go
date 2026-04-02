@@ -4,23 +4,23 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/bloXroute-Labs/bxcommon-go/cache"
 	"github.com/bloXroute-Labs/bxcommon-go/cert"
 	"github.com/bloXroute-Labs/bxcommon-go/clock"
+	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
 	"github.com/bloXroute-Labs/bxcommon-go/syncmap"
 	"github.com/bloXroute-Labs/bxcommon-go/types"
-	"github.com/gorilla/mux"
-
-	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type handlerArgs struct {
@@ -1166,7 +1166,7 @@ func TestSDNHTTP_HttpPostUnmarshallError(t *testing.T) {
 
 func mockNodesServer(t *testing.T, nodeID types.NodeID, externalPort int64, externalIP, protocol, network string, blockchainNetworkNum types.NetworkNum, accountID types.AccountID) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		requestBytes, err := ioutil.ReadAll(r.Body)
+		requestBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.FailNow()
 		}

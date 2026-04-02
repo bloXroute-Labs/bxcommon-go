@@ -2,7 +2,6 @@ package sdnsdk
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"time"
@@ -70,7 +69,7 @@ func SetupCAFiles() {
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(CACertPath, []byte(CACert), 0644)
+	err = os.WriteFile(CACertPath, []byte(CACert), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -109,11 +108,11 @@ func writeCerts(folder, name, cert, key string) {
 	keyPath := path.Join(p, fmt.Sprintf("%v_cert.pem", name))
 	certPath := path.Join(p, fmt.Sprintf("%v_key.pem", name))
 
-	err := ioutil.WriteFile(keyPath, []byte(cert), 0644)
+	err := os.WriteFile(keyPath, []byte(cert), 0644)
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(certPath, []byte(key), 0644)
+	err = os.WriteFile(certPath, []byte(key), 0644)
 	if err != nil {
 		panic(err)
 	}
