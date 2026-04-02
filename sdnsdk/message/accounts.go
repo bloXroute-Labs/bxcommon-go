@@ -326,6 +326,7 @@ type Account struct {
 	EthTxReceiptsStreaming BDNQuotaService `json:"eth_tx_receipts_streaming"`
 	EthMevStreaming        BDNBasicService `json:"eth_mev_streaming"`
 	EthBundleSimulation    BDNBasicService `json:"eth_bundle_simulation"`
+	EthBuilder             BDNBasicService `json:"eth_builder"`
 
 	BscMempoolStreaming    BDNQuotaService `json:"bsc_mempool_streaming"`
 	BscBlocksStreaming     BDNQuotaService `json:"bsc_blocks_streaming"`
@@ -769,6 +770,9 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			},
 		},
 		BDNPrivateRegions: BDNBasicService{
+			ExpireDateTime: now.Add(time.Hour),
+		},
+		EthBuilder: BDNBasicService{
 			ExpireDateTime: now.Add(time.Hour),
 		},
 	}
