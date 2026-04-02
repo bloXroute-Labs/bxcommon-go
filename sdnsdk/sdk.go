@@ -964,8 +964,3 @@ func (s *realSDNHTTP) RemoveInternalGatewaySubscription(accountID types.AccountI
 	}
 	return nil
 }
-
-var (
-	errAuthHeaderNotBase65   = errors.New("auth header is not base64 encoded")
-	errAuthHeaderWrongFormat = errors.New("account_id and hash could not be generated from auth header")
-)

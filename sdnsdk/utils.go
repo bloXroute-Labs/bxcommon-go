@@ -3,6 +3,7 @@ package sdnsdk
 import (
 	"bufio"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -11,6 +12,11 @@ import (
 	"strings"
 
 	"github.com/bloXroute-Labs/bxcommon-go/types"
+)
+
+var (
+	errAuthHeaderNotBase64   = errors.New("auth header is not base64 encoded")
+	errAuthHeaderWrongFormat = errors.New("account_id and hash could not be generated from auth header")
 )
 
 // UpdateCacheFile - update a cache file
