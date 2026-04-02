@@ -69,7 +69,7 @@ func GetIP(host string) (string, error) {
 func GetAccountIDSecretHashFromHeader(authHeader string) (types.AccountID, string, error) {
 	payload, err := base64.StdEncoding.DecodeString(authHeader)
 	if err != nil {
-		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderNotBase65, authHeader)
+		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderNotBase64, authHeader)
 	}
 	accountIDAndHash := strings.SplitN(string(payload), ":", 2)
 	if len(accountIDAndHash) <= 1 {

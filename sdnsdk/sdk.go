@@ -89,6 +89,7 @@ type realSDNHTTP struct {
 	dataDir          string
 	nodeModel        *message.NodeModel
 	relays           message.Peers
+	nodeLock         *sync.RWMutex
 }
 
 // relayMap maps a relay's IP to its port
@@ -166,6 +167,7 @@ func NewSDNHTTP(sslCerts *cert.SSLCerts, sdnURL string, nodeModel message.NodeMo
 		nodeModel:        &nodeModel,
 		getPingLatencies: getPingLatencies,
 		dataDir:          dataDir,
+		nodeLock:         &sync.RWMutex{},
 	}
 	return sdn
 }
@@ -231,22 +233,25 @@ func (s *realSDNHTTP) FetchBlockchainNetwork() error {
 
 // InitGateway fetches all necessary information over HTTP from the SDN
 func (s *realSDNHTTP) InitGateway(protocol string, network string) error {
-	var err error
-	s.nodeModel.Network = network
+	s.nodeLock.Lock()
 	s.nodeModel.Protocol = protocol
+	s.nodeModel.Network = network
+	s.nodeLock.Unlock()
+
 	s.networks = make(message.BlockchainNetworks)
 
-	if err = s.Register(); err != nil {
+	if err := s.Register(); err != nil {
 		return err
 	}
-	if err = s.FetchBlockchainNetwork(); err != nil {
+	if err := s.FetchBlockchainNetwork(); err != nil {
 		return err
 	}
-	err = s.getAccountModel(s.nodeModel.AccountID)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	s.nodeLock.RLock()
+	accountID := s.nodeModel.AccountID
+	s.nodeLock.RUnlock()
+
+	return s.getAccountModel(accountID)
 }
 
 // RotateCertificate checks if the private certificate is expiring within the renewal period and rotates it if needed
@@ -267,20 +272,30 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 		return fmt.Errorf("could not create csr for new private certificate: %v", err)
 	}
 
+	s.nodeLock.Lock()
 	s.nodeModel.Csr = string(csr)
+	body := bytes.NewBuffer(s.nodeModel.Pack())
+	s.nodeLock.Unlock()
 
-	resp, err := s.httpWithCacheAndContext(ctx, s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, bytes.NewBuffer(s.nodeModel.Pack()))
+	resp, err := s.httpWithCacheAndContext(ctx, s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, body)
 	if err != nil {
 		return err
 	}
-	if err = json.Unmarshal(resp, &s.nodeModel); err != nil {
+
+	var newNodeModel message.NodeModel
+
+	if err = json.Unmarshal(resp, &newNodeModel); err != nil {
 		return fmt.Errorf("could not deserialize '%s' response into node model: %w", string(resp), err)
 	}
 
-	err = s.sslCerts.SavePrivateCert(s.nodeModel.Cert)
+	err = s.sslCerts.SavePrivateCert(newNodeModel.Cert)
 	if err != nil {
 		return fmt.Errorf("could not save new private certificate: %w", err)
 	}
+
+	s.nodeLock.Lock()
+	s.nodeModel = &newNodeModel
+	s.nodeLock.Unlock()
 
 	return nil
 }
@@ -311,9 +326,14 @@ func (s realSDNHTTP) DirectRelayConnections(relayHosts string, relayLimit uint64
 		return nil
 	}
 
+	s.nodeLock.RLock()
+	networkNum := s.nodeModel.BlockchainNetworkNum
+	nodeID := s.nodeModel.NodeID
+	s.nodeLock.RUnlock()
+
 	// TODO: fetching relay from SDN should be done in a loop inside manageAutoRelays
 	// if auto relays specified, start and manage them
-	relays, err := s.getRelays(s.nodeModel.NodeID, s.nodeModel.BlockchainNetworkNum)
+	relays, err := s.getRelays(nodeID, networkNum)
 	if err != nil {
 		return fmt.Errorf("failed to extract relay list: %v", err)
 	}
@@ -325,7 +345,12 @@ func (s realSDNHTTP) DirectRelayConnections(relayHosts string, relayLimit uint64
 }
 
 func (s realSDNHTTP) connectToNewRelay(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) error {
-	relays, err := s.getRelays(s.nodeModel.NodeID, s.nodeModel.BlockchainNetworkNum)
+	s.nodeLock.RLock()
+	nodeID := s.nodeModel.NodeID
+	networkNum := s.nodeModel.BlockchainNetworkNum
+	s.nodeLock.RUnlock()
+
+	relays, err := s.getRelays(nodeID, networkNum)
 	if err != nil {
 		return fmt.Errorf("failed to extract relay list: %v", err)
 	}
@@ -443,7 +468,12 @@ func convertMapToSortedSlice(connectedAutoRelays map[string]types.RelayInfo) []a
 }
 
 func (s realSDNHTTP) FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) {
-	relays, err := s.getRelays(s.nodeModel.NodeID, s.nodeModel.BlockchainNetworkNum)
+	s.nodeLock.RLock()
+	nodeID := s.nodeModel.NodeID
+	networkNum := s.nodeModel.BlockchainNetworkNum
+	s.nodeLock.RUnlock()
+
+	relays, err := s.getRelays(nodeID, networkNum)
 	if err != nil {
 		log.Errorf("failed to extract relyInfo list: %v", err)
 		return
@@ -514,6 +544,9 @@ func (s realSDNHTTP) FindNewRelay(ctx context.Context, oldRelayIP string, oldRel
 
 // NodeModel returns the node model returned by the SDN
 func (s realSDNHTTP) NodeModel() *message.NodeModel {
+	s.nodeLock.RLock()
+	defer s.nodeLock.RUnlock()
+
 	return s.nodeModel
 }
 
@@ -529,6 +562,9 @@ func (s realSDNHTTP) AccountModel() message.Account {
 
 // NetworkNum returns the registered network number of the node model
 func (s realSDNHTTP) NetworkNum() types.NetworkNum {
+	s.nodeLock.RLock()
+	defer s.nodeLock.RUnlock()
+
 	return s.nodeModel.BlockchainNetworkNum
 }
 
@@ -563,7 +599,9 @@ func (s *realSDNHTTP) Register() error {
 		if err != nil {
 			return err
 		}
+		s.nodeLock.Lock()
 		s.nodeModel.Csr = string(csr)
+		s.nodeLock.Unlock()
 	} else {
 		nodeID, err := s.sslCerts.GetNodeID()
 		if err != nil {
@@ -582,7 +620,10 @@ func (s *realSDNHTTP) Register() error {
 	if err != nil {
 		return err
 	}
-	if err = json.Unmarshal(resp, &s.nodeModel); err != nil {
+
+	var newNodeModel message.NodeModel
+
+	if err = json.Unmarshal(resp, &newNodeModel); err != nil {
 		return fmt.Errorf("could not deserialize '%s' response into node model: %v", string(resp), err)
 	}
 	accountID, err := s.sslCerts.GetAccountID()
@@ -590,24 +631,22 @@ func (s *realSDNHTTP) Register() error {
 		return err
 	}
 
-	s.nodeID = s.nodeModel.NodeID
+	s.nodeLock.Lock()
+	s.nodeModel = &newNodeModel
+	s.nodeID = newNodeModel.NodeID
 	s.accountID = accountID
+	newCert := newNodeModel.Cert
+	s.nodeLock.Unlock()
 
 	if s.sslCerts.NeedsPrivateCert() {
-		// first, check if the SDN returned the cert
-		if s.nodeModel.Cert != "" {
-			err = s.sslCerts.SavePrivateCert(s.nodeModel.Cert)
-			// should pretty much never happen unless there are SDN problems, in which
-			// case just abort on startup
-			if err != nil {
-				debug.PrintStack()
-				panic(err)
-			}
+		err := s.sslCerts.SavePrivateCert(newCert)
+		// should pretty much never happen unless there are SDN problems, in which
+		// case just abort on startup
+		if err != nil {
+			debug.PrintStack()
+			panic(err)
 		}
-
-		return nil
 	}
-
 	return nil
 }
 
