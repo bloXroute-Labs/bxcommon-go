@@ -1,6 +1,6 @@
 module github.com/bloXroute-Labs/bxcommon-go
 
-go 1.25.1
+go 1.26.1
 
 require (
 	github.com/fluent/fluent-logger-golang v1.10.1
