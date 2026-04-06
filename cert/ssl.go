@@ -34,7 +34,7 @@ type SSLCerts struct {
 	registrationOnlyKey       ecdsa.PrivateKey
 	registrationOnlyKeyPair   tls.Certificate
 
-	lock *sync.Mutex
+	lock sync.Mutex
 }
 
 // GetCertDir getting cert, key and registration files
@@ -160,7 +160,7 @@ func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registr
 		registrationOnlyKey:       *registrationOnlyKey,
 		registrationOnlyKeyPair:   registrationOnlyKeyPair,
 
-		lock: &sync.Mutex{},
+		lock: sync.Mutex{},
 	}
 }
 

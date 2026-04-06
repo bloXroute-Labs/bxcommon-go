@@ -89,7 +89,7 @@ type realSDNHTTP struct {
 	dataDir          string
 	nodeModel        *message.NodeModel
 	relays           message.Peers
-	nodeLock         *sync.RWMutex
+	nodeLock         sync.RWMutex
 }
 
 // relayMap maps a relay's IP to its port
@@ -167,7 +167,7 @@ func NewSDNHTTP(sslCerts *cert.SSLCerts, sdnURL string, nodeModel message.NodeMo
 		nodeModel:        &nodeModel,
 		getPingLatencies: getPingLatencies,
 		dataDir:          dataDir,
-		nodeLock:         &sync.RWMutex{},
+		nodeLock:         sync.RWMutex{},
 	}
 	return sdn
 }
