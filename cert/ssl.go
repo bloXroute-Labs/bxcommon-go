@@ -178,7 +178,7 @@ func parsePEMCert(block []byte) (*x509.Certificate, error) {
 }
 
 // NeedsPrivateCert indicates if SSL storage has been populated with the private certificate
-func (s SSLCerts) NeedsPrivateCert() bool {
+func (s *SSLCerts) NeedsPrivateCert() bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -187,7 +187,7 @@ func (s SSLCerts) NeedsPrivateCert() bool {
 
 // CreateCSR returns a PEM encoded x509.CertificateRequest, generated using the registration only cert template
 // and signed with the private key
-func (s SSLCerts) CreateCSR() ([]byte, error) {
+func (s *SSLCerts) CreateCSR() ([]byte, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -204,7 +204,7 @@ func (s SSLCerts) CreateCSR() ([]byte, error) {
 }
 
 // SerializeRegistrationCert returns the PEM encoded registration x509.Certificate
-func (s SSLCerts) SerializeRegistrationCert() ([]byte, error) {
+func (s *SSLCerts) SerializeRegistrationCert() ([]byte, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -243,7 +243,7 @@ func (s *SSLCerts) SavePrivateCert(privateCert string) error {
 
 // LoadPrivateConfig generates TLS config from the private certificates.
 // The resulting config can be used for any bxapi or socket communications.
-func (s SSLCerts) LoadPrivateConfig() (*tls.Config, error) {
+func (s *SSLCerts) LoadPrivateConfig() (*tls.Config, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -259,7 +259,7 @@ func (s SSLCerts) LoadPrivateConfig() (*tls.Config, error) {
 
 // LoadPrivateConfigWithCA generates TLS config from the private certificate.
 // The resulting config can be used to configure a server that allows inbound connections.
-func (s SSLCerts) LoadPrivateConfigWithCA(caPath string) (*tls.Config, error) {
+func (s *SSLCerts) LoadPrivateConfigWithCA(caPath string) (*tls.Config, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -287,7 +287,7 @@ func (s SSLCerts) LoadPrivateConfigWithCA(caPath string) (*tls.Config, error) {
 }
 
 // GetNodeID reads the node ID embedded in the private certificate storage
-func (s SSLCerts) GetNodeID() (types.NodeID, error) {
+func (s *SSLCerts) GetNodeID() (types.NodeID, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -304,7 +304,7 @@ func (s SSLCerts) GetNodeID() (types.NodeID, error) {
 }
 
 // GetAccountID reads the account ID embedded in the local certificates
-func (s SSLCerts) GetAccountID() (types.AccountID, error) {
+func (s *SSLCerts) GetAccountID() (types.AccountID, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -318,7 +318,7 @@ func (s SSLCerts) GetAccountID() (types.AccountID, error) {
 // LoadRegistrationConfig generates TLS config from the registration only certificate.
 // The resulting config can only be used to register the node with bxapi, which will
 // then return a private certificate for future use.
-func (s SSLCerts) LoadRegistrationConfig() (*tls.Config, error) {
+func (s *SSLCerts) LoadRegistrationConfig() (*tls.Config, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -330,7 +330,7 @@ func (s SSLCerts) LoadRegistrationConfig() (*tls.Config, error) {
 }
 
 // PrivateCertFile return source of private cert
-func (s SSLCerts) PrivateCertFile() string {
+func (s *SSLCerts) PrivateCertFile() string {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -338,14 +338,14 @@ func (s SSLCerts) PrivateCertFile() string {
 }
 
 // PrivateKeyFile return source of private key
-func (s SSLCerts) PrivateKeyFile() string {
+func (s *SSLCerts) PrivateKeyFile() string {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	return s.privateKeyFile
 }
 
-func (s SSLCerts) PrivateCertExpirationDate() (time.Time, error) {
+func (s *SSLCerts) PrivateCertExpirationDate() (time.Time, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
