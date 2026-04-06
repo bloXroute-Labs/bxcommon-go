@@ -3,7 +3,6 @@ package sdnsdk
 import (
 	"bufio"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,11 +11,6 @@ import (
 	"strings"
 
 	"github.com/bloXroute-Labs/bxcommon-go/types"
-)
-
-var (
-	errAuthHeaderNotBase64   = errors.New("auth header is not base64 encoded")
-	errAuthHeaderWrongFormat = errors.New("account_id and hash could not be generated from auth header")
 )
 
 // UpdateCacheFile - update a cache file
@@ -75,11 +69,11 @@ func GetIP(host string) (string, error) {
 func GetAccountIDSecretHashFromHeader(authHeader string) (types.AccountID, string, error) {
 	payload, err := base64.StdEncoding.DecodeString(authHeader)
 	if err != nil {
-		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderNotBase64, authHeader)
+		return "", "", fmt.Errorf("auth header is not base64 encoded: %w", err)
 	}
 	accountIDAndHash := strings.SplitN(string(payload), ":", 2)
 	if len(accountIDAndHash) <= 1 {
-		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderWrongFormat, authHeader)
+		return "", "", fmt.Errorf("account_id and hash could not be generated from auth header: %w", err)
 	}
 	accountID := types.AccountID(accountIDAndHash[0])
 	secretHash := accountIDAndHash[1]
