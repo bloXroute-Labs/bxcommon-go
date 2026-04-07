@@ -258,7 +258,7 @@ func (s *realSDNHTTP) InitGateway(protocol string, network string) error {
 func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 	expDate, err := s.sslCerts.PrivateCertExpirationDate()
 	if err != nil {
-		return fmt.Errorf("could not get private certificate expiration date: %v", err)
+		return fmt.Errorf("could not get private certificate expiration date: %w", err)
 	}
 
 	if time.Until(expDate) > privateCertRenewalPeriodDays*24*time.Hour {
