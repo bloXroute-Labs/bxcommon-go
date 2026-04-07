@@ -1383,7 +1383,7 @@ func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 	defer server.Close()
 
 	s := &realSDNHTTP{
-		sslCerts:  &sslCerts,
+		sslCerts:  sslCerts,
 		sdnURL:    server.URL,
 		nodeModel: &message.NodeModel{},
 	}
@@ -1468,7 +1468,7 @@ func TestRotateCertificate_NoopWhenNotWithinRenewalWindow(t *testing.T) {
 	defer server.Close()
 
 	s := &realSDNHTTP{
-		sslCerts:  &sslCerts,
+		sslCerts:  sslCerts,
 		sdnURL:    server.URL,
 		nodeModel: &message.NodeModel{},
 	}
