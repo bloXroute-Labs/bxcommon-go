@@ -880,7 +880,7 @@ func getPingLatencies(peers message.Peers) []nodeLatencyInfo {
 			address := net.JoinHostPort(p.IP, strconv.FormatInt(p.Port, 10))
 
 			start := time.Now()
-			conn, err := net.DialTimeout("tcp", address, PingTimeout)
+			conn, err := net.DialTimeout("tcp", address, time.Duration(PingTimeout)*time.Millisecond)
 			duration := time.Since(start)
 
 			if err != nil {
