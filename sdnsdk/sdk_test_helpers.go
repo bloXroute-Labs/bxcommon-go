@@ -45,14 +45,14 @@ const (
 )
 
 // SetupTestCerts uses the test certs specified in constants to return an utils.SSLCerts object for connection testing
-func SetupTestCerts() cert.SSLCerts {
+func SetupTestCerts() *cert.SSLCerts {
 	defer CleanupSSLCerts()
 	SetupSSLFiles("test")
 	return NewTestCertsWithoutSetup()
 }
 
 // NewTestCertsWithoutSetup uses the test certs specified in constants to return an utils.SSLCerts object for connection testing. This function does not do any setup/teardown of writing said files temporarily to disk.
-func NewTestCertsWithoutSetup() cert.SSLCerts {
+func NewTestCertsWithoutSetup() *cert.SSLCerts {
 	return cert.NewSSLCerts(SSLTestPath, SSLTestPath, "test")
 }
 

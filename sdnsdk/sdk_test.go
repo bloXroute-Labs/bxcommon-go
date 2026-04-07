@@ -101,7 +101,7 @@ func TestRegister_BlockchainNetworkNumberUpdated(t *testing.T) {
 			testCerts := SetupTestCerts()
 			s := realSDNHTTP{
 				sdnURL:   server.URL,
-				sslCerts: &testCerts,
+				sslCerts: testCerts,
 				nodeModel: &message.NodeModel{
 					Protocol: testCase.nodeModel.Protocol,
 					Network:  testCase.nodeModel.Network,
@@ -955,7 +955,8 @@ func TestSDNHTTP_InitGateway(t *testing.T) {
 		defer cleanupFiles()
 
 		sslCerts := cert.NewSSLCertsPrivateKey(PrivateKey)
-		sslCerts.SavePrivateCert(PrivateCert)
+		err := sslCerts.SavePrivateCert(PrivateCert)
+		require.NoError(t, err)
 
 		handler1 := mockNodesServer(t, testCase.nodeModel.NodeID, testCase.nodeModel.ExternalPort, testCase.nodeModel.ExternalIP, testCase.nodeModel.Protocol, testCase.nodeModel.Network, testCase.networkNumber, testCase.nodeModel.AccountID)
 		handler2, _ := mockBlockchainNetworkServer(t, testCase.jsonRespNetwork)
@@ -997,7 +998,8 @@ func TestSDNHTTP_InitGateway_Fail(t *testing.T) {
 	}
 	t.Run(fmt.Sprint(testCase), func(t *testing.T) {
 		sslCerts := cert.NewSSLCertsPrivateKey(PrivateKey)
-		sslCerts.SavePrivateCert(PrivateCert)
+		err := sslCerts.SavePrivateCert(PrivateCert)
+		require.NoError(t, err)
 
 		handler1 := mockServiceError(t, 503, testCase.jsonRespServiceUnavailable)
 		var m []handlerArgs
@@ -1011,7 +1013,8 @@ func TestSDNHTTP_InitGateway_Fail(t *testing.T) {
 		IPResolverHolder = &MockIPResolver{IP: "11.111.111.111"}
 		sdn := NewSDNHTTP(sslCerts, server.URL, message.NodeModel{}, "").(*realSDNHTTP)
 
-		os.Remove(nodeModelCacheFileName)
+		err = os.Remove(nodeModelCacheFileName)
+		require.NoError(t, err)
 		assert.NotNil(t, sdn.InitGateway(types.EthereumProtocol, "Mainnet"))
 	})
 }
@@ -1115,7 +1118,7 @@ func TestSDNHTTP_HttpPostBodyError(t *testing.T) {
 		testCerts := SetupTestCerts()
 		sdn := realSDNHTTP{
 			sdnURL:   server.URL,
-			sslCerts: &testCerts,
+			sslCerts: testCerts,
 			nodeModel: &message.NodeModel{
 				NodeType: testCase.nodeModel.NodeType,
 			},
@@ -1157,7 +1160,7 @@ func TestSDNHTTP_HttpPostUnmarshallError(t *testing.T) {
 		testCerts := SetupTestCerts()
 		sdn := realSDNHTTP{
 			sdnURL:   server.URL,
-			sslCerts: &testCerts,
+			sslCerts: testCerts,
 			nodeModel: &message.NodeModel{
 				NodeType: testCase.nodeModel.NodeType,
 			},
@@ -1309,10 +1312,6 @@ func generateNetworks() []*message.BlockchainNetwork {
 	networks = append(networks, network1)
 	networks = append(networks, network2)
 	return networks
-}
-
-func generateTestNetwork() *message.BlockchainNetwork {
-	return &message.BlockchainNetwork{AllowGasPriceChangeReuseSenderNonce: 1.1, AllowedFromTier: "Developer", SendCrossGeo: true, Network: "TestNetwork", Protocol: "TestProtocol", NetworkNum: 0}
 }
 
 func writeToFile(t *testing.T, data interface{}, fileName string) {
