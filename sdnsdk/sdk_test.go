@@ -11,9 +11,12 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -1173,158 +1176,6 @@ func TestSDNHTTP_HttpPostUnmarshallError(t *testing.T) {
 	})
 }
 
-func mockNodesServer(t *testing.T, nodeID types.NodeID, externalPort int64, externalIP, protocol, network string, blockchainNetworkNum types.NetworkNum, accountID types.AccountID) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		requestBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.FailNow()
-		}
-
-		var requestNodeModel message.NodeModel
-		err = json.Unmarshal(requestBytes, &requestNodeModel)
-		if err != nil || requestNodeModel.Protocol != protocol || requestNodeModel.Network != network {
-			t.FailNow()
-		}
-
-		if requestNodeModel.BlockchainNetworkNum == 0 {
-			requestNodeModel.BlockchainNetworkNum = blockchainNetworkNum
-		}
-		responseNodeModel := message.NodeModel{
-			NodeID:               nodeID,
-			ExternalIP:           externalIP,
-			ExternalPort:         externalPort,
-			Protocol:             protocol,
-			Network:              network,
-			BlockchainNetworkNum: requestNodeModel.BlockchainNetworkNum,
-			AccountID:            accountID,
-		}
-
-		responseBytes, err := json.Marshal(responseNodeModel)
-		if err != nil {
-			t.FailNow()
-		}
-
-		_, err = w.Write(responseBytes)
-		if err != nil {
-			t.FailNow()
-		}
-	}
-}
-
-func mockServiceError(t *testing.T, statusCode int, unavailableJSON string) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(statusCode)
-		_, err := w.Write([]byte(unavailableJSON))
-		if err != nil {
-			t.FailNow()
-		}
-	}
-}
-
-func mockNodeModelServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.NodeModel) {
-	var requestNodeModel message.NodeModel
-	err := json.Unmarshal([]byte(nodeModel), &requestNodeModel)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(nodeModel))
-		if err != nil {
-			t.FailNow()
-		}
-	}, requestNodeModel
-}
-
-func mockBlockchainNetworkServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.BlockchainNetwork) {
-	var network message.BlockchainNetwork
-	err := json.Unmarshal([]byte(nodeModel), &network)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(nodeModel))
-		if err != nil {
-			t.FailNow()
-		}
-	}, network
-}
-
-func mockRelaysServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.Peers) {
-	var relays message.Peers
-	err := json.Unmarshal([]byte(nodeModel), &relays)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(nodeModel))
-		if err != nil {
-			t.FailNow()
-		}
-	}, relays
-}
-
-func mockAccountServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.Account) {
-	var account message.Account
-	err := json.Unmarshal([]byte(nodeModel), &account)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(nodeModel))
-		if err != nil {
-			t.FailNow()
-		}
-	}, account
-}
-
-func mockRouter(handlerArgs []handlerArgs) *httptest.Server {
-	router := mux.NewRouter()
-	for _, args := range handlerArgs {
-		router.HandleFunc(args.pattern, args.handler).Methods(args.method)
-	}
-	server := httptest.NewServer(router)
-	return server
-}
-
-func generateAccountModel() message.Account {
-	accountModel := message.Account{SecretHash: "1234"}
-	return accountModel
-}
-
-func generatePeers() message.Peers {
-	peers := message.Peers{}
-	peers = append(peers, message.Peer{IP: "8.208.101.30", Port: 1809})
-	peers = append(peers, message.Peer{IP: "47.90.133.153", Port: 1809})
-	return peers
-}
-
-func generateNodeModel() *message.NodeModel {
-	nodeModel := &message.NodeModel{NodeType: "EXTERNAL_GATEWAY", ExternalPort: 1809, IsDocker: true}
-	return nodeModel
-}
-
-func generateNetworks() []*message.BlockchainNetwork {
-	var networks []*message.BlockchainNetwork
-	network1 := &message.BlockchainNetwork{AllowGasPriceChangeReuseSenderNonce: 1.1, AllowedFromTier: "Developer", SendCrossGeo: true, Network: "Mainnet", Protocol: "Ethereum", NetworkNum: 5}
-	network2 := &message.BlockchainNetwork{AllowGasPriceChangeReuseSenderNonce: 1.1, AllowedFromTier: "Enterprise", SendCrossGeo: true, Network: "BSC-Mainnet", Protocol: "Ethereum", NetworkNum: 10}
-	networks = append(networks, network1)
-	networks = append(networks, network2)
-	return networks
-}
-
-func writeToFile(t *testing.T, data interface{}, fileName string) {
-	value, err := json.Marshal(data)
-	if err != nil {
-		t.FailNow()
-	}
-
-	if cache.UpdateCacheFile("", fileName, value) != nil {
-		t.FailNow()
-	}
-}
-
 func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 	defer cleanupFiles()
 	defer CleanupSSLCerts()
@@ -1481,4 +1332,201 @@ func TestRotateCertificate_NoopWhenNotWithinRenewalWindow(t *testing.T) {
 	got, err := os.ReadFile(privateCertFile)
 	require.NoError(t, err, "could not read private cert file")
 	require.Contains(t, string(got), "BEGIN CERTIFICATE")
+}
+
+func TestGetPingLatencies(t *testing.T) {
+	l1, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "failed to start listener on l1")
+	defer l1.Close()
+
+	l2, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "failed to start listener on l2")
+	defer l2.Close()
+
+	_, port1Str, _ := net.SplitHostPort(l1.Addr().String())
+	_, port2Str, _ := net.SplitHostPort(l2.Addr().String())
+	port1, _ := strconv.ParseInt(port1Str, 10, 64)
+	port2, _ := strconv.ParseInt(port2Str, 10, 64)
+
+	peers := []message.Peer{
+		{IP: "127.0.0.1", Port: port1}, // online
+		{IP: "127.0.0.1", Port: port2}, // online
+		{IP: "127.0.0.1", Port: 1},     // offline (usually)
+	}
+
+	results := getPingLatencies(peers)
+	assert.Equal(t, len(peers), len(results), "expected number of results should match number of peers")
+
+	sliceISSorted := sort.SliceIsSorted(results, func(i, j int) bool {
+		return results[i].Latency < results[j].Latency
+	})
+	require.True(t, sliceISSorted, "results should be sorted by latency")
+
+	// check that our offline node got the penalty value
+	foundPenalty := false
+	for _, res := range results {
+		if res.Port == 1 && res.Latency == 999999.0 {
+			foundPenalty = true
+		}
+	}
+	assert.True(t, foundPenalty, "expected to find offline node with penalty latency 999999.0")
+
+	for _, res := range results {
+		if res.Port == port1 || res.Port == port2 {
+			assert.LessOrEqual(t, res.Latency, 999999.0, "online node should have latency less or equal than penalty value")
+			assert.Greater(t, res.Latency, 0.0, "online node should have latency greater than 0")
+		}
+	}
+}
+
+func mockNodesServer(t *testing.T, nodeID types.NodeID, externalPort int64, externalIP, protocol, network string, blockchainNetworkNum types.NetworkNum, accountID types.AccountID) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.FailNow()
+		}
+
+		var requestNodeModel message.NodeModel
+		err = json.Unmarshal(requestBytes, &requestNodeModel)
+		if err != nil || requestNodeModel.Protocol != protocol || requestNodeModel.Network != network {
+			t.FailNow()
+		}
+
+		if requestNodeModel.BlockchainNetworkNum == 0 {
+			requestNodeModel.BlockchainNetworkNum = blockchainNetworkNum
+		}
+		responseNodeModel := message.NodeModel{
+			NodeID:               nodeID,
+			ExternalIP:           externalIP,
+			ExternalPort:         externalPort,
+			Protocol:             protocol,
+			Network:              network,
+			BlockchainNetworkNum: requestNodeModel.BlockchainNetworkNum,
+			AccountID:            accountID,
+		}
+
+		responseBytes, err := json.Marshal(responseNodeModel)
+		if err != nil {
+			t.FailNow()
+		}
+
+		_, err = w.Write(responseBytes)
+		if err != nil {
+			t.FailNow()
+		}
+	}
+}
+
+func mockServiceError(t *testing.T, statusCode int, unavailableJSON string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(statusCode)
+		_, err := w.Write([]byte(unavailableJSON))
+		if err != nil {
+			t.FailNow()
+		}
+	}
+}
+
+func mockNodeModelServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.NodeModel) {
+	var requestNodeModel message.NodeModel
+	err := json.Unmarshal([]byte(nodeModel), &requestNodeModel)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(nodeModel))
+		if err != nil {
+			t.FailNow()
+		}
+	}, requestNodeModel
+}
+
+func mockBlockchainNetworkServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.BlockchainNetwork) {
+	var network message.BlockchainNetwork
+	err := json.Unmarshal([]byte(nodeModel), &network)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(nodeModel))
+		if err != nil {
+			t.FailNow()
+		}
+	}, network
+}
+
+func mockRelaysServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.Peers) {
+	var relays message.Peers
+	err := json.Unmarshal([]byte(nodeModel), &relays)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(nodeModel))
+		if err != nil {
+			t.FailNow()
+		}
+	}, relays
+}
+
+func mockAccountServer(t *testing.T, nodeModel string) (func(w http.ResponseWriter, r *http.Request), message.Account) {
+	var account message.Account
+	err := json.Unmarshal([]byte(nodeModel), &account)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(nodeModel))
+		if err != nil {
+			t.FailNow()
+		}
+	}, account
+}
+
+func mockRouter(handlerArgs []handlerArgs) *httptest.Server {
+	router := mux.NewRouter()
+	for _, args := range handlerArgs {
+		router.HandleFunc(args.pattern, args.handler).Methods(args.method)
+	}
+	server := httptest.NewServer(router)
+	return server
+}
+
+func generateAccountModel() message.Account {
+	accountModel := message.Account{SecretHash: "1234"}
+	return accountModel
+}
+
+func generatePeers() message.Peers {
+	peers := message.Peers{}
+	peers = append(peers, message.Peer{IP: "8.208.101.30", Port: 1809})
+	peers = append(peers, message.Peer{IP: "47.90.133.153", Port: 1809})
+	return peers
+}
+
+func generateNodeModel() *message.NodeModel {
+	nodeModel := &message.NodeModel{NodeType: "EXTERNAL_GATEWAY", ExternalPort: 1809, IsDocker: true}
+	return nodeModel
+}
+
+func generateNetworks() []*message.BlockchainNetwork {
+	var networks []*message.BlockchainNetwork
+	network1 := &message.BlockchainNetwork{AllowGasPriceChangeReuseSenderNonce: 1.1, AllowedFromTier: "Developer", SendCrossGeo: true, Network: "Mainnet", Protocol: "Ethereum", NetworkNum: 5}
+	network2 := &message.BlockchainNetwork{AllowGasPriceChangeReuseSenderNonce: 1.1, AllowedFromTier: "Enterprise", SendCrossGeo: true, Network: "BSC-Mainnet", Protocol: "Ethereum", NetworkNum: 10}
+	networks = append(networks, network1)
+	networks = append(networks, network2)
+	return networks
+}
+
+func writeToFile(t *testing.T, data interface{}, fileName string) {
+	value, err := json.Marshal(data)
+	if err != nil {
+		t.FailNow()
+	}
+
+	if cache.UpdateCacheFile("", fileName, value) != nil {
+		t.FailNow()
+	}
 }

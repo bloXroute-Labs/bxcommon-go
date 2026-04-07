@@ -10,9 +10,8 @@ import (
 	"io"
 	"math"
 	"math/big"
+	"net"
 	"net/http"
-	"os/exec"
-	"regexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -870,39 +869,44 @@ func (s *realSDNHTTP) MinTxAge() time.Duration {
 
 // getPingLatencies pings list of SDN peers and returns sorted list of nodeLatencyInfo for each successful peer ping
 func getPingLatencies(peers message.Peers) []nodeLatencyInfo {
-	potentialRelaysCount := len(peers)
-	pingResults := make([]nodeLatencyInfo, potentialRelaysCount)
 	var wg sync.WaitGroup
-	wg.Add(potentialRelaysCount)
+	resultsChan := make(chan nodeLatencyInfo, len(peers))
 
-	for peerCount, peer := range peers {
-		pingResults[peerCount] = nodeLatencyInfo{peer.IP, peer.Port, PingTimeout}
-		go func(pingResult *nodeLatencyInfo) {
+	for _, peer := range peers {
+		wg.Add(1)
+		go func(p message.Peer) {
 			defer wg.Done()
-			cmd := exec.Command("ping", (*pingResult).IP, "-c1", "-W2")
-			var out bytes.Buffer
-			var stderr bytes.Buffer
-			cmd.Stdout = &out
-			cmd.Stderr = &stderr
-			if err := cmd.Run(); err != nil {
-				log.Errorf("error executing (%v) %v: %v", cmd, err, stderr)
+
+			address := net.JoinHostPort(p.IP, strconv.FormatInt(p.Port, 10))
+
+			start := time.Now()
+			conn, err := net.DialTimeout("tcp", address, PingTimeout)
+			duration := time.Since(start)
+
+			if err != nil {
+				resultsChan <- nodeLatencyInfo{IP: p.IP, Port: p.Port, Latency: 999999.0}
 				return
 			}
-			log.Tracef("ping results from %v: %q", (*pingResult).IP, out.String())
-			re := regexp.MustCompile(TimeRegEx)
-			latencyTimeList := re.FindStringSubmatch(out.String())
-			if len(latencyTimeList) > 0 {
-				latencyTime, _ := strconv.ParseFloat(latencyTimeList[1], 64)
-				if latencyTime > 0 {
-					(*pingResult).Latency = latencyTime
-				}
-			}
-		}(&pingResults[peerCount])
-	}
-	wg.Wait()
+			conn.Close()
 
-	sort.Slice(pingResults, func(i int, j int) bool { return pingResults[i].Latency < pingResults[j].Latency })
-	log.Infof("latency results for potential relays: %v", pingResults)
+			// convert duration to milliseconds
+			latencyMs := float64(duration.Microseconds()) / 1000.0
+			resultsChan <- nodeLatencyInfo{IP: p.IP, Port: p.Port, Latency: latencyMs}
+		}(peer)
+	}
+
+	wg.Wait()
+	close(resultsChan)
+
+	var pingResults []nodeLatencyInfo
+	for res := range resultsChan {
+		pingResults = append(pingResults, res)
+	}
+
+	sort.Slice(pingResults, func(i, j int) bool {
+		return pingResults[i].Latency < pingResults[j].Latency
+	})
+
 	return pingResults
 }
 
