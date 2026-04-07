@@ -3,6 +3,7 @@ package sdnsdk
 import (
 	"bufio"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/bloXroute-Labs/bxcommon-go/types"
 )
+
+var ErrMalformedAuthHeader = errors.New("auth header is not in the correct format")
 
 // UpdateCacheFile - update a cache file
 func UpdateCacheFile(dataDir string, fileName string, value []byte) error {
@@ -73,7 +76,7 @@ func GetAccountIDSecretHashFromHeader(authHeader string) (types.AccountID, strin
 	}
 	accountIDAndHash := strings.SplitN(string(payload), ":", 2)
 	if len(accountIDAndHash) <= 1 {
-		return "", "", fmt.Errorf("account_id and hash could not be generated from auth header: %w", err)
+		return "", "", ErrMalformedAuthHeader
 	}
 	accountID := types.AccountID(accountIDAndHash[0])
 	secretHash := accountIDAndHash[1]

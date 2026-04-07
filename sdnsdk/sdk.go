@@ -277,7 +277,7 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 	body := bytes.NewBuffer(s.nodeModel.Pack())
 	s.nodeLock.Unlock()
 
-	resp, err := s.httpWithCacheAndContext(ctx, s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, body)
+	resp, err := s.httpWithContext(ctx, s.sdnURL+"/nodes", http.MethodPost, body)
 	if err != nil {
 		return err
 	}
@@ -610,13 +610,21 @@ func (s *realSDNHTTP) Register() error {
 		s.nodeID = nodeID
 	}
 
-	if s.nodeModel.NodeID != "" {
-		log.Debugf("registering SDN for %s with node ID '%v' and version '%v'", s.nodeModel.NodeType, s.nodeModel.NodeID, s.nodeModel.SourceVersion)
+	s.nodeLock.RLock()
+	nodeType := s.nodeModel.NodeType
+	nodeModelNodeID := s.nodeModel.NodeID
+	srcVersion := s.nodeModel.SourceVersion
+	externalIP := s.nodeModel.ExternalIP
+	packed := bytes.NewBuffer(s.nodeModel.Pack())
+	s.nodeLock.RUnlock()
+
+	if nodeModelNodeID != "" {
+		log.Debugf("registering SDN for %s with node ID '%v' and version '%v'", nodeType, nodeModelNodeID, srcVersion)
 	} else {
-		log.Debugf("registering SDN for %s with IP '%v' and version '%v'", s.nodeModel.NodeType, s.nodeModel.ExternalIP, s.nodeModel.SourceVersion)
+		log.Debugf("registering SDN for %s with IP '%v' and version '%v'", nodeType, externalIP, srcVersion)
 	}
 
-	resp, err := s.httpWithCache(s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, bytes.NewBuffer(s.nodeModel.Pack()))
+	resp, err := s.httpWithCache(s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, packed)
 	if err != nil {
 		return err
 	}
