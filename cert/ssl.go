@@ -58,7 +58,7 @@ func GetCertDir(registrationOnlyBaseURL, privateBaseURL, certName string) (priva
 // Registration only keys/certs are mandatory. If they cannot be loaded, this function will panic.
 // Private keys and certs must match each other. If they do not, a new private key will be generated
 // and written, pending loading of a new certificate.
-func NewSSLCerts(registrationOnlyBaseURL, privateBaseURL, certName string) SSLCerts {
+func NewSSLCerts(registrationOnlyBaseURL, privateBaseURL, certName string) *SSLCerts {
 	privateCertFile, privateKeyFile, registrationOnlyCertFile, registrationOnlyKeyFile := GetCertDir(registrationOnlyBaseURL, privateBaseURL, certName)
 	return NewSSLCertsFromFiles(privateCertFile, privateKeyFile, registrationOnlyCertFile, registrationOnlyKeyFile)
 }
@@ -73,7 +73,7 @@ func NewSSLCertsPrivateKey(privateKey string) *SSLCerts {
 // Registration only keys/certs are mandatory. If they cannot be loaded, this function will panic.
 // Private keys and certs must match each other. If they do not, a new private key will be generated
 // and written, pending loading of a new certificate.
-func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registrationOnlyCertFile string, registrationOnlyKeyFile string) SSLCerts {
+func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registrationOnlyCertFile string, registrationOnlyKeyFile string) *SSLCerts {
 	registrationOnlyCertBlock, err := os.ReadFile(registrationOnlyCertFile)
 	if err != nil {
 		panic(fmt.Errorf("could not read registration only cert from file (%v): %v", registrationOnlyCertFile, err))
@@ -146,7 +146,7 @@ func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registr
 		panic(fmt.Errorf("found a certificate with no matching private key –– delete the certificate at %v if it's not needed", privateCertFile))
 	}
 
-	return SSLCerts{
+	return &SSLCerts{
 		privateCertFile: privateCertFile,
 		privateKeyFile:  privateKeyFile,
 		privateCert:     privateCert,

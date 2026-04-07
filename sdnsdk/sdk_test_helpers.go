@@ -105,14 +105,14 @@ func makeFolders(name string) {
 
 func writeCerts(folder, name, cert, key string) {
 	p := path.Join(SSLTestPath, name, folder)
-	keyPath := path.Join(p, fmt.Sprintf("%v_cert.pem", name))
-	certPath := path.Join(p, fmt.Sprintf("%v_key.pem", name))
+	certPath := path.Join(p, fmt.Sprintf("%v_cert.pem", name))
+	keyPath := path.Join(p, fmt.Sprintf("%v_key.pem", name))
 
-	err := os.WriteFile(keyPath, []byte(cert), 0644)
+	err := os.WriteFile(certPath, []byte(cert), 0644)
 	if err != nil {
 		panic(err)
 	}
-	err = os.WriteFile(certPath, []byte(key), 0644)
+	err = os.WriteFile(keyPath, []byte(key), 0644)
 	if err != nil {
 		panic(err)
 	}
