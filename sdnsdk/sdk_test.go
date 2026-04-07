@@ -110,7 +110,7 @@ func TestRegister_BlockchainNetworkNumberUpdated(t *testing.T) {
 
 			err := s.Register()
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, testCase.nodeModel.Network, s.nodeModel.Network)
 			assert.Equal(t, testCase.nodeModel.Protocol, s.nodeModel.Protocol)
 			assert.Equal(t, testCase.networkNumber, s.nodeModel.BlockchainNetworkNum)
@@ -188,7 +188,7 @@ func TestDirectRelayConnections_IfPingOver40MSLogsWarning(t *testing.T) {
 
 			autoRelayInstructions := make(chan RelayInstruction)
 			err := sdn.DirectRelayConnections("auto", 1, autoRelayInstructions, syncmap.NewStringMapOf[types.RelayInfo]())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			var selectedRelay RelayInstruction
 			select {
 			case selectedRelay = <-autoRelayInstructions:
@@ -799,7 +799,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_BlockchainNetworks(t *testing
 		// bxapi is not responsive
 		// -> trying to load the blockchain networks from cache file
 		resp, err := sdn.httpWithCache(url, http.MethodGet, blockchainNetworksCacheFileName, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		cachedNetwork := []*message.BlockchainNetwork{}
 		assert.Nil(t, json.Unmarshal(resp, &cachedNetwork))
@@ -841,7 +841,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_Node(t *testing.T) {
 		// bxapi is not responsive
 		// -> trying to load the node model from cache file
 		resp, err := sdn.httpWithCache(sdn.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, bytes.NewBuffer(sdn.NodeModel().Pack()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		cachedNodeModel := &message.NodeModel{}
 		assert.Nil(t, json.Unmarshal(resp, &cachedNodeModel))
@@ -883,7 +883,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_Relays(t *testing.T) {
 		// bxapi is not responsive
 		// -> trying to load the peers from cache file
 		resp, err := sdn.httpWithCache(url, http.MethodGet, potentialRelaysFileName, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		cachedPeers := message.Peers{}
 		assert.Nil(t, json.Unmarshal(resp, &cachedPeers))
@@ -926,7 +926,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_Account(t *testing.T) {
 		// bxapi is not responsive
 		// -> trying to load the account model from cache file
 		resp, err := sdn.httpWithCache(url, http.MethodGet, accountModelsFileName, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
 		cachedAccountModel := message.Account{}
@@ -1339,17 +1339,11 @@ func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 
 	// Read existing private key
 	keyBytes, err := os.ReadFile(privateKeyFile)
-	if err != nil {
-		t.Fatalf("could not read private key file: %v", err)
-	}
+	require.NoError(t, err, "could not read private key file")
 	decodedKey, _ := pem.Decode(keyBytes)
-	if decodedKey == nil {
-		t.Fatalf("could not decode PEM private key")
-	}
+	require.NotNil(t, decodedKey, "could not decode PEM private key")
 	privKey, err := x509.ParseECPrivateKey(decodedKey.Bytes)
-	if err != nil {
-		t.Fatalf("could not parse EC private key: %v", err)
-	}
+	require.NoError(t, err, "could not parse EC private key")
 
 	// Create a short-lived certificate (expires in 1 day) signed with that private key
 	template := x509.Certificate{
@@ -1362,27 +1356,20 @@ func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 	}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privKey.PublicKey, privKey)
-	if err != nil {
-		t.Fatalf("could not create certificate: %v", err)
-	}
+	require.NoError(t, err, "could not create certificate")
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 
 	// Write the short-lived cert to the private cert file so NewSSLCerts will load it
-	if err := os.WriteFile(privateCertFile, certPEM, 0644); err != nil {
-		t.Fatalf("could not write private cert file: %v", err)
-	}
+	err = os.WriteFile(privateCertFile, certPEM, 0644)
+	require.NoError(t, err, "could not write private cert file")
 
 	// Initialize ssl certs from files (will pick up our short-lived cert)
 	sslCerts := cert.NewSSLCerts(SSLTestPath, SSLTestPath, certName)
 
 	// Sanity check expiration is within renewal period
 	exp, err := sslCerts.PrivateCertExpirationDate()
-	if err != nil {
-		t.Fatalf("failed to get private cert expiration date: %v", err)
-	}
-	if time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour {
-		t.Fatalf("prepared cert is not within renewal window")
-	}
+	require.NoError(t, err, "failed to get private cert expiration date")
+	assert.False(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is not within renewal window")
 
 	// Mock SDN server to return node model containing new cert (we return the same cert for simplicity)
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -1403,19 +1390,13 @@ func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 
 	ctx := context.Background()
 	err = s.RotateCertificate(ctx)
-	assert.NoError(t, err)
-
-	// node model should have been updated with returned cert
-	if s.nodeModel == nil {
-		t.Fatalf("nodeModel unexpected nil")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, s.nodeModel, "nodeModel should not be nil after rotation")
 	assert.Equal(t, string(certPEM), s.nodeModel.Cert)
 
 	// The private cert file should contain the cert we wrote (and saved again)
 	got, err := os.ReadFile(privateCertFile)
-	if err != nil {
-		t.Fatalf("could not read private cert file: %v", err)
-	}
+	require.NoError(t, err, "could not read private cert file")
 	assert.Contains(t, string(got), "BEGIN CERTIFICATE")
 }
 
@@ -1430,5 +1411,75 @@ func TestRotateCertificate_NoPrivateCertError(t *testing.T) {
 
 	err := s.RotateCertificate(context.Background())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "could not get private certificate expiration date")
+	require.Contains(t, err.Error(), "could not get private certificate expiration date")
+}
+
+func TestRotateCertificate_NoopWhenNotWithinRenewalWindow(t *testing.T) {
+	defer cleanupFiles()
+	defer CleanupSSLCerts()
+
+	// prepare ssl files for a unique cert name
+	certName := "rotate_noop"
+	SetupSSLFiles(certName)
+
+	// get paths for private cert and key
+	privateCertFile, privateKeyFile, _, _ := cert.GetCertDir(SSLTestPath, SSLTestPath, certName)
+
+	// read existing private key
+	keyBytes, err := os.ReadFile(privateKeyFile)
+	require.NoError(t, err, "could not read private key file")
+	decodedKey, _ := pem.Decode(keyBytes)
+	require.NotNil(t, decodedKey, "could not decode PEM private key")
+	privKey, err := x509.ParseECPrivateKey(decodedKey.Bytes)
+	require.NoError(t, err, "could not parse EC private key")
+
+	// create a long-lived certificate (expires well after renewal window) signed with that private key
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "rotate-noop-test"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add((privateCertRenewalPeriodDays + 10) * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privKey.PublicKey, privKey)
+	require.NoError(t, err, "could not create certificate")
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	// write the long-lived cert to the private cert file so NewSSLCerts will load it
+	if err := os.WriteFile(privateCertFile, certPEM, 0644); err != nil {
+		require.NoError(t, err, "could not write private cert file")
+	}
+
+	// initialize ssl certs from files (will pick up our long-lived cert)
+	sslCerts := cert.NewSSLCerts(SSLTestPath, SSLTestPath, certName)
+
+	// sanity check expiration is NOT within renewal period
+	exp, err := sslCerts.PrivateCertExpirationDate()
+	require.NoError(t, err, "failed to get private cert expiration date")
+	require.True(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is within renewal window")
+
+	// mock SDN server that would fail the test if /nodes is invoked
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		require.FailNow(t, "unexpected call to /nodes when certificate is not within renewal window")
+	}
+	server := mockRouter([]handlerArgs{{method: "POST", pattern: "/nodes", handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts:  &sslCerts,
+		sdnURL:    server.URL,
+		nodeModel: &message.NodeModel{},
+	}
+
+	ctx := context.Background()
+	// should be a no-op and return nil without calling /nodes
+	err = s.RotateCertificate(ctx)
+	require.NoError(t, err)
+
+	// ensure private cert file still contains our certificate
+	got, err := os.ReadFile(privateCertFile)
+	require.NoError(t, err, "could not read private cert file")
+	require.Contains(t, string(got), "BEGIN CERTIFICATE")
 }

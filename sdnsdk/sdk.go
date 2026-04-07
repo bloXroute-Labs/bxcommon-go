@@ -269,7 +269,7 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 
 	csr, err := s.sslCerts.CreateCSR()
 	if err != nil {
-		return fmt.Errorf("could not create csr for new private certificate: %v", err)
+		return fmt.Errorf("could not create csr for new private certificate: %w", err)
 	}
 
 	s.nodeLock.Lock()
