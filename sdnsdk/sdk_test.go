@@ -2,25 +2,34 @@ package sdnsdk
 
 import (
 	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/bloXroute-Labs/bxcommon-go/cache"
 	"github.com/bloXroute-Labs/bxcommon-go/cert"
 	"github.com/bloXroute-Labs/bxcommon-go/clock"
+	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
 	"github.com/bloXroute-Labs/bxcommon-go/syncmap"
 	"github.com/bloXroute-Labs/bxcommon-go/types"
-	"github.com/gorilla/mux"
-
-	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type handlerArgs struct {
@@ -95,7 +104,7 @@ func TestRegister_BlockchainNetworkNumberUpdated(t *testing.T) {
 			testCerts := SetupTestCerts()
 			s := realSDNHTTP{
 				sdnURL:   server.URL,
-				sslCerts: &testCerts,
+				sslCerts: testCerts,
 				nodeModel: &message.NodeModel{
 					Protocol: testCase.nodeModel.Protocol,
 					Network:  testCase.nodeModel.Network,
@@ -104,7 +113,7 @@ func TestRegister_BlockchainNetworkNumberUpdated(t *testing.T) {
 
 			err := s.Register()
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, testCase.nodeModel.Network, s.nodeModel.Network)
 			assert.Equal(t, testCase.nodeModel.Protocol, s.nodeModel.Protocol)
 			assert.Equal(t, testCase.networkNumber, s.nodeModel.BlockchainNetworkNum)
@@ -182,7 +191,7 @@ func TestDirectRelayConnections_IfPingOver40MSLogsWarning(t *testing.T) {
 
 			autoRelayInstructions := make(chan RelayInstruction)
 			err := sdn.DirectRelayConnections("auto", 1, autoRelayInstructions, syncmap.NewStringMapOf[types.RelayInfo]())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			var selectedRelay RelayInstruction
 			select {
 			case selectedRelay = <-autoRelayInstructions:
@@ -793,7 +802,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_BlockchainNetworks(t *testing
 		// bxapi is not responsive
 		// -> trying to load the blockchain networks from cache file
 		resp, err := sdn.httpWithCache(url, http.MethodGet, blockchainNetworksCacheFileName, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		cachedNetwork := []*message.BlockchainNetwork{}
 		assert.Nil(t, json.Unmarshal(resp, &cachedNetwork))
@@ -835,7 +844,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_Node(t *testing.T) {
 		// bxapi is not responsive
 		// -> trying to load the node model from cache file
 		resp, err := sdn.httpWithCache(sdn.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, bytes.NewBuffer(sdn.NodeModel().Pack()))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		cachedNodeModel := &message.NodeModel{}
 		assert.Nil(t, json.Unmarshal(resp, &cachedNodeModel))
@@ -877,7 +886,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_Relays(t *testing.T) {
 		// bxapi is not responsive
 		// -> trying to load the peers from cache file
 		resp, err := sdn.httpWithCache(url, http.MethodGet, potentialRelaysFileName, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		cachedPeers := message.Peers{}
 		assert.Nil(t, json.Unmarshal(resp, &cachedPeers))
@@ -920,7 +929,7 @@ func TestSDNHTTP_CacheFiles_ServiceUnavailable_SDN_Account(t *testing.T) {
 		// bxapi is not responsive
 		// -> trying to load the account model from cache file
 		resp, err := sdn.httpWithCache(url, http.MethodGet, accountModelsFileName, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
 		cachedAccountModel := message.Account{}
@@ -949,7 +958,8 @@ func TestSDNHTTP_InitGateway(t *testing.T) {
 		defer cleanupFiles()
 
 		sslCerts := cert.NewSSLCertsPrivateKey(PrivateKey)
-		sslCerts.SavePrivateCert(PrivateCert)
+		err := sslCerts.SavePrivateCert(PrivateCert)
+		require.NoError(t, err)
 
 		handler1 := mockNodesServer(t, testCase.nodeModel.NodeID, testCase.nodeModel.ExternalPort, testCase.nodeModel.ExternalIP, testCase.nodeModel.Protocol, testCase.nodeModel.Network, testCase.networkNumber, testCase.nodeModel.AccountID)
 		handler2, _ := mockBlockchainNetworkServer(t, testCase.jsonRespNetwork)
@@ -991,7 +1001,8 @@ func TestSDNHTTP_InitGateway_Fail(t *testing.T) {
 	}
 	t.Run(fmt.Sprint(testCase), func(t *testing.T) {
 		sslCerts := cert.NewSSLCertsPrivateKey(PrivateKey)
-		sslCerts.SavePrivateCert(PrivateCert)
+		err := sslCerts.SavePrivateCert(PrivateCert)
+		require.NoError(t, err)
 
 		handler1 := mockServiceError(t, 503, testCase.jsonRespServiceUnavailable)
 		var m []handlerArgs
@@ -1005,7 +1016,8 @@ func TestSDNHTTP_InitGateway_Fail(t *testing.T) {
 		IPResolverHolder = &MockIPResolver{IP: "11.111.111.111"}
 		sdn := NewSDNHTTP(sslCerts, server.URL, message.NodeModel{}, "").(*realSDNHTTP)
 
-		os.Remove(nodeModelCacheFileName)
+		err = os.Remove(nodeModelCacheFileName)
+		require.NoError(t, err)
 		assert.NotNil(t, sdn.InitGateway(types.EthereumProtocol, "Mainnet"))
 	})
 }
@@ -1109,7 +1121,7 @@ func TestSDNHTTP_HttpPostBodyError(t *testing.T) {
 		testCerts := SetupTestCerts()
 		sdn := realSDNHTTP{
 			sdnURL:   server.URL,
-			sslCerts: &testCerts,
+			sslCerts: testCerts,
 			nodeModel: &message.NodeModel{
 				NodeType: testCase.nodeModel.NodeType,
 			},
@@ -1151,7 +1163,7 @@ func TestSDNHTTP_HttpPostUnmarshallError(t *testing.T) {
 		testCerts := SetupTestCerts()
 		sdn := realSDNHTTP{
 			sdnURL:   server.URL,
-			sslCerts: &testCerts,
+			sslCerts: testCerts,
 			nodeModel: &message.NodeModel{
 				NodeType: testCase.nodeModel.NodeType,
 			},
@@ -1164,9 +1176,212 @@ func TestSDNHTTP_HttpPostUnmarshallError(t *testing.T) {
 	})
 }
 
+func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
+	defer cleanupFiles()
+	defer CleanupSSLCerts()
+
+	// Prepare ssl files for a unique cert name
+	certName := "rotate"
+	SetupSSLFiles(certName)
+
+	// Get paths for private cert and key
+	privateCertFile, privateKeyFile, _, _ := cert.GetCertDir(SSLTestPath, SSLTestPath, certName)
+
+	// Read existing private key
+	keyBytes, err := os.ReadFile(privateKeyFile)
+	require.NoError(t, err, "could not read private key file")
+	decodedKey, _ := pem.Decode(keyBytes)
+	require.NotNil(t, decodedKey, "could not decode PEM private key")
+	privKey, err := x509.ParseECPrivateKey(decodedKey.Bytes)
+	require.NoError(t, err, "could not parse EC private key")
+
+	// Create a short-lived certificate (expires in 1 day) signed with that private key
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "rotate-test"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privKey.PublicKey, privKey)
+	require.NoError(t, err, "could not create certificate")
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	// Write the short-lived cert to the private cert file so NewSSLCerts will load it
+	err = os.WriteFile(privateCertFile, certPEM, 0644)
+	require.NoError(t, err, "could not write private cert file")
+
+	// Initialize ssl certs from files (will pick up our short-lived cert)
+	sslCerts := cert.NewSSLCerts(SSLTestPath, SSLTestPath, certName)
+
+	// Sanity check expiration is within renewal period
+	exp, err := sslCerts.PrivateCertExpirationDate()
+	require.NoError(t, err, "failed to get private cert expiration date")
+	assert.False(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is not within renewal window")
+
+	// Mock SDN server to return node model containing new cert (we return the same cert for simplicity)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		// read body to ensure csr was sent
+		_, _ = io.ReadAll(r.Body)
+		nm := message.NodeModel{Cert: string(certPEM)}
+		b, _ := json.Marshal(nm)
+		_, _ = w.Write(b)
+	}
+	server := mockRouter([]handlerArgs{{method: "POST", pattern: "/nodes", handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts:  sslCerts,
+		sdnURL:    server.URL,
+		nodeModel: &message.NodeModel{},
+	}
+
+	ctx := context.Background()
+	err = s.RotateCertificate(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, s.nodeModel, "nodeModel should not be nil after rotation")
+	assert.Equal(t, string(certPEM), s.nodeModel.Cert)
+
+	// The private cert file should contain the cert we wrote (and saved again)
+	got, err := os.ReadFile(privateCertFile)
+	require.NoError(t, err, "could not read private cert file")
+	assert.Contains(t, string(got), "BEGIN CERTIFICATE")
+}
+
+func TestRotateCertificate_NoPrivateCertError(t *testing.T) {
+	// Use SSLCerts initialized only with a private key to simulate missing private cert
+	sslCerts := cert.NewSSLCertsPrivateKey(PrivateKey)
+	s := &realSDNHTTP{
+		sslCerts:  sslCerts,
+		sdnURL:    "",
+		nodeModel: &message.NodeModel{},
+	}
+
+	err := s.RotateCertificate(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "could not get private certificate expiration date")
+}
+
+func TestRotateCertificate_NoopWhenNotWithinRenewalWindow(t *testing.T) {
+	defer cleanupFiles()
+	defer CleanupSSLCerts()
+
+	// prepare ssl files for a unique cert name
+	certName := "rotate_noop"
+	SetupSSLFiles(certName)
+
+	// get paths for private cert and key
+	privateCertFile, privateKeyFile, _, _ := cert.GetCertDir(SSLTestPath, SSLTestPath, certName)
+
+	// read existing private key
+	keyBytes, err := os.ReadFile(privateKeyFile)
+	require.NoError(t, err, "could not read private key file")
+	decodedKey, _ := pem.Decode(keyBytes)
+	require.NotNil(t, decodedKey, "could not decode PEM private key")
+	privKey, err := x509.ParseECPrivateKey(decodedKey.Bytes)
+	require.NoError(t, err, "could not parse EC private key")
+
+	// create a long-lived certificate (expires well after renewal window) signed with that private key
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "rotate-noop-test"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add((privateCertRenewalPeriodDays + 10) * 24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privKey.PublicKey, privKey)
+	require.NoError(t, err, "could not create certificate")
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	// write the long-lived cert to the private cert file so NewSSLCerts will load it
+	if err := os.WriteFile(privateCertFile, certPEM, 0644); err != nil {
+		require.NoError(t, err, "could not write private cert file")
+	}
+
+	// initialize ssl certs from files (will pick up our long-lived cert)
+	sslCerts := cert.NewSSLCerts(SSLTestPath, SSLTestPath, certName)
+
+	// sanity check expiration is NOT within renewal period
+	exp, err := sslCerts.PrivateCertExpirationDate()
+	require.NoError(t, err, "failed to get private cert expiration date")
+	require.True(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is within renewal window")
+
+	// mock SDN server that would fail the test if /nodes is invoked
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		require.FailNow(t, "unexpected call to /nodes when certificate is not within renewal window")
+	}
+	server := mockRouter([]handlerArgs{{method: "POST", pattern: "/nodes", handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts:  sslCerts,
+		sdnURL:    server.URL,
+		nodeModel: &message.NodeModel{},
+	}
+
+	ctx := context.Background()
+	// should be a no-op and return nil without calling /nodes
+	err = s.RotateCertificate(ctx)
+	require.NoError(t, err)
+
+	// ensure private cert file still contains our certificate
+	got, err := os.ReadFile(privateCertFile)
+	require.NoError(t, err, "could not read private cert file")
+	require.Contains(t, string(got), "BEGIN CERTIFICATE")
+}
+
+func TestGetPingLatencies(t *testing.T) {
+	l1, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "failed to start listener on l1")
+	defer l1.Close()
+
+	l2, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "failed to start listener on l2")
+	defer l2.Close()
+
+	_, port1Str, _ := net.SplitHostPort(l1.Addr().String())
+	_, port2Str, _ := net.SplitHostPort(l2.Addr().String())
+	port1, _ := strconv.ParseInt(port1Str, 10, 64)
+	port2, _ := strconv.ParseInt(port2Str, 10, 64)
+
+	peers := []message.Peer{
+		{IP: "127.0.0.1", Port: port1}, // online
+		{IP: "127.0.0.1", Port: port2}, // online
+		{IP: "127.0.0.1", Port: 1},     // offline (usually)
+	}
+
+	results := getPingLatencies(peers)
+	assert.Equal(t, len(peers), len(results), "expected number of results should match number of peers")
+
+	sliceISSorted := sort.SliceIsSorted(results, func(i, j int) bool {
+		return results[i].Latency < results[j].Latency
+	})
+	require.True(t, sliceISSorted, "results should be sorted by latency")
+
+	// check that our offline node got the penalty value
+	foundPenalty := false
+	for _, res := range results {
+		if res.Port == 1 && res.Latency == 999999.0 {
+			foundPenalty = true
+		}
+	}
+	assert.True(t, foundPenalty, "expected to find offline node with penalty latency 999999.0")
+
+	for _, res := range results {
+		if res.Port == port1 || res.Port == port2 {
+			assert.LessOrEqual(t, res.Latency, 999999.0, "online node should have latency less or equal than penalty value")
+			assert.Greater(t, res.Latency, 0.0, "online node should have latency greater than 0")
+		}
+	}
+}
+
 func mockNodesServer(t *testing.T, nodeID types.NodeID, externalPort int64, externalIP, protocol, network string, blockchainNetworkNum types.NetworkNum, accountID types.AccountID) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		requestBytes, err := ioutil.ReadAll(r.Body)
+		requestBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.FailNow()
 		}
@@ -1303,10 +1518,6 @@ func generateNetworks() []*message.BlockchainNetwork {
 	networks = append(networks, network1)
 	networks = append(networks, network2)
 	return networks
-}
-
-func generateTestNetwork() *message.BlockchainNetwork {
-	return &message.BlockchainNetwork{AllowGasPriceChangeReuseSenderNonce: 1.1, AllowedFromTier: "Developer", SendCrossGeo: true, Network: "TestNetwork", Protocol: "TestProtocol", NetworkNum: 0}
 }
 
 func writeToFile(t *testing.T, data interface{}, fileName string) {

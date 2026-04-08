@@ -1,44 +1,28 @@
 package sdnsdk
 
 import (
-	"bufio"
+	"encoding/base64"
+	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path"
-	"time"
+	"strings"
+
+	"github.com/bloXroute-Labs/bxcommon-go/types"
 )
 
-const defaultBypass = time.Second * 10
+var ErrMalformedAuthHeader = errors.New("auth header is not in the correct format")
 
 // UpdateCacheFile - update a cache file
 func UpdateCacheFile(dataDir string, fileName string, value []byte) error {
 	cacheFileName := path.Join(dataDir, fileName)
-	f, err := os.OpenFile(cacheFileName, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	writer := bufio.NewWriter(f)
-	_, err = writer.Write(value)
-	if err != nil {
-		return err
-	}
-
-	return writer.Flush()
+	return os.WriteFile(cacheFileName, value, 0644)
 }
 
 // LoadCacheFile - load a cache file
 func LoadCacheFile(dataDir string, fileName string) ([]byte, error) {
-	cacheFileName := path.Join(dataDir, fileName)
-	f, err := os.Open(cacheFileName)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	return io.ReadAll(bufio.NewReader(f))
+	return os.ReadFile(path.Join(dataDir, fileName))
 }
 
 // GetIP checks the existence of and returns the IP address for a host name
@@ -62,4 +46,19 @@ func GetIP(host string) (string, error) {
 		return ips[0], nil
 	}
 	return host, nil
+}
+
+// GetAccountIDSecretHashFromHeader extracts accountID and secret values from an authorization header
+func GetAccountIDSecretHashFromHeader(authHeader string) (types.AccountID, string, error) {
+	payload, err := base64.StdEncoding.DecodeString(authHeader)
+	if err != nil {
+		return "", "", fmt.Errorf("auth header is not base64 encoded: %w", err)
+	}
+	accountIDAndHash := strings.SplitN(string(payload), ":", 2)
+	if len(accountIDAndHash) <= 1 {
+		return "", "", ErrMalformedAuthHeader
+	}
+	accountID := types.AccountID(accountIDAndHash[0])
+	secretHash := accountIDAndHash[1]
+	return accountID, secretHash, nil
 }

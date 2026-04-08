@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
+	"time"
 
 	"github.com/bloXroute-Labs/bxcommon-go/types"
 )
@@ -31,6 +33,8 @@ type SSLCerts struct {
 	registrationOnlyCertBlock []byte
 	registrationOnlyKey       ecdsa.PrivateKey
 	registrationOnlyKeyPair   tls.Certificate
+
+	lock sync.Mutex
 }
 
 // GetCertDir getting cert, key and registration files
@@ -54,7 +58,7 @@ func GetCertDir(registrationOnlyBaseURL, privateBaseURL, certName string) (priva
 // Registration only keys/certs are mandatory. If they cannot be loaded, this function will panic.
 // Private keys and certs must match each other. If they do not, a new private key will be generated
 // and written, pending loading of a new certificate.
-func NewSSLCerts(registrationOnlyBaseURL, privateBaseURL, certName string) SSLCerts {
+func NewSSLCerts(registrationOnlyBaseURL, privateBaseURL, certName string) *SSLCerts {
 	privateCertFile, privateKeyFile, registrationOnlyCertFile, registrationOnlyKeyFile := GetCertDir(registrationOnlyBaseURL, privateBaseURL, certName)
 	return NewSSLCertsFromFiles(privateCertFile, privateKeyFile, registrationOnlyCertFile, registrationOnlyKeyFile)
 }
@@ -69,7 +73,7 @@ func NewSSLCertsPrivateKey(privateKey string) *SSLCerts {
 // Registration only keys/certs are mandatory. If they cannot be loaded, this function will panic.
 // Private keys and certs must match each other. If they do not, a new private key will be generated
 // and written, pending loading of a new certificate.
-func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registrationOnlyCertFile string, registrationOnlyKeyFile string) SSLCerts {
+func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registrationOnlyCertFile string, registrationOnlyKeyFile string) *SSLCerts {
 	registrationOnlyCertBlock, err := os.ReadFile(registrationOnlyCertFile)
 	if err != nil {
 		panic(fmt.Errorf("could not read registration only cert from file (%v): %v", registrationOnlyCertFile, err))
@@ -142,7 +146,7 @@ func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registr
 		panic(fmt.Errorf("found a certificate with no matching private key –– delete the certificate at %v if it's not needed", privateCertFile))
 	}
 
-	return SSLCerts{
+	return &SSLCerts{
 		privateCertFile: privateCertFile,
 		privateKeyFile:  privateKeyFile,
 		privateCert:     privateCert,
@@ -155,6 +159,8 @@ func NewSSLCertsFromFiles(privateCertFile string, privateKeyFile string, registr
 		registrationOnlyCertBlock: registrationOnlyCertBlock,
 		registrationOnlyKey:       *registrationOnlyKey,
 		registrationOnlyKeyPair:   registrationOnlyKeyPair,
+
+		lock: sync.Mutex{},
 	}
 }
 
@@ -172,13 +178,19 @@ func parsePEMCert(block []byte) (*x509.Certificate, error) {
 }
 
 // NeedsPrivateCert indicates if SSL storage has been populated with the private certificate
-func (s SSLCerts) NeedsPrivateCert() bool {
+func (s *SSLCerts) NeedsPrivateCert() bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	return s.privateCert == nil
 }
 
 // CreateCSR returns a PEM encoded x509.CertificateRequest, generated using the registration only cert template
 // and signed with the private key
-func (s SSLCerts) CreateCSR() ([]byte, error) {
+func (s *SSLCerts) CreateCSR() ([]byte, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	certRequest := x509.CertificateRequest{
 		Subject:    s.registrationOnlyCert.Subject,
 		Extensions: s.registrationOnlyCert.Extensions,
@@ -192,12 +204,22 @@ func (s SSLCerts) CreateCSR() ([]byte, error) {
 }
 
 // SerializeRegistrationCert returns the PEM encoded registration x509.Certificate
-func (s SSLCerts) SerializeRegistrationCert() ([]byte, error) {
+func (s *SSLCerts) SerializeRegistrationCert() ([]byte, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	return s.registrationOnlyCertBlock, nil
 }
 
 // SavePrivateCert saves the private certificate and updates the key pair.
 func (s *SSLCerts) SavePrivateCert(privateCert string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if len(privateCert) == 0 {
+		return errors.New("private cert string is empty")
+	}
+
 	privateCertBytes := []byte(privateCert)
 	cert, err := parsePEMCert(privateCertBytes)
 	if err != nil {
@@ -221,7 +243,10 @@ func (s *SSLCerts) SavePrivateCert(privateCert string) error {
 
 // LoadPrivateConfig generates TLS config from the private certificates.
 // The resulting config can be used for any bxapi or socket communications.
-func (s SSLCerts) LoadPrivateConfig() (*tls.Config, error) {
+func (s *SSLCerts) LoadPrivateConfig() (*tls.Config, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if s.privateKeyPair == nil {
 		return nil, errors.New("private key pair has not been loaded")
 	}
@@ -234,7 +259,10 @@ func (s SSLCerts) LoadPrivateConfig() (*tls.Config, error) {
 
 // LoadPrivateConfigWithCA generates TLS config from the private certificate.
 // The resulting config can be used to configure a server that allows inbound connections.
-func (s SSLCerts) LoadPrivateConfigWithCA(caPath string) (*tls.Config, error) {
+func (s *SSLCerts) LoadPrivateConfigWithCA(caPath string) (*tls.Config, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if s.privateKeyPair == nil {
 		return nil, errors.New("private key pair has not been loaded")
 	}
@@ -259,7 +287,10 @@ func (s SSLCerts) LoadPrivateConfigWithCA(caPath string) (*tls.Config, error) {
 }
 
 // GetNodeID reads the node ID embedded in the private certificate storage
-func (s SSLCerts) GetNodeID() (types.NodeID, error) {
+func (s *SSLCerts) GetNodeID() (types.NodeID, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if s.privateCert == nil {
 		return "", errors.New("private certificate has not been loaded")
 	}
@@ -273,7 +304,10 @@ func (s SSLCerts) GetNodeID() (types.NodeID, error) {
 }
 
 // GetAccountID reads the account ID embedded in the local certificates
-func (s SSLCerts) GetAccountID() (types.AccountID, error) {
+func (s *SSLCerts) GetAccountID() (types.AccountID, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	sslProperties, err := ParseBxCertificate(&s.registrationOnlyCert)
 	if err != ErrNodeIDNotEmbedded {
 		return "", err
@@ -284,7 +318,10 @@ func (s SSLCerts) GetAccountID() (types.AccountID, error) {
 // LoadRegistrationConfig generates TLS config from the registration only certificate.
 // The resulting config can only be used to register the node with bxapi, which will
 // then return a private certificate for future use.
-func (s SSLCerts) LoadRegistrationConfig() (*tls.Config, error) {
+func (s *SSLCerts) LoadRegistrationConfig() (*tls.Config, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	config := &tls.Config{
 		Certificates:       []tls.Certificate{s.registrationOnlyKeyPair},
 		InsecureSkipVerify: true,
@@ -293,11 +330,29 @@ func (s SSLCerts) LoadRegistrationConfig() (*tls.Config, error) {
 }
 
 // PrivateCertFile return source of private cert
-func (s SSLCerts) PrivateCertFile() string {
+func (s *SSLCerts) PrivateCertFile() string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	return s.privateCertFile
 }
 
 // PrivateKeyFile return source of private key
-func (s SSLCerts) PrivateKeyFile() string {
+func (s *SSLCerts) PrivateKeyFile() string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	return s.privateKeyFile
+}
+
+func (s *SSLCerts) PrivateCertExpirationDate() (time.Time, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.privateCert == nil {
+		return time.Time{}, errors.New("private certificate has not been loaded")
+	}
+
+	return s.privateCert.NotAfter, nil
+
 }

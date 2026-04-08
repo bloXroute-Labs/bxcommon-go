@@ -4,16 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"math/big"
+	"net"
 	"net/http"
-	"os/exec"
-	"regexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -45,6 +43,7 @@ const (
 	accountModelsFileName           = "accountmodel.json"
 	httpTimeout                     = 10 * time.Second
 	latencyThreshold                = 10
+	privateCertRenewalPeriodDays    = 180
 )
 
 // SDNHTTP is the interface for realSDNHTTP type
@@ -74,6 +73,7 @@ type SDNHTTP interface {
 	SetInternalGateway(state *message.InternalGateway) error
 	AddInternalGatewaySubscription(accountID types.AccountID) error
 	RemoveInternalGatewaySubscription(accountID types.AccountID) error
+	RotateCertificate(ctx context.Context) error
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -88,6 +88,7 @@ type realSDNHTTP struct {
 	dataDir          string
 	nodeModel        *message.NodeModel
 	relays           message.Peers
+	nodeLock         sync.RWMutex
 }
 
 // relayMap maps a relay's IP to its port
@@ -165,6 +166,7 @@ func NewSDNHTTP(sslCerts *cert.SSLCerts, sdnURL string, nodeModel message.NodeMo
 		nodeModel:        &nodeModel,
 		getPingLatencies: getPingLatencies,
 		dataDir:          dataDir,
+		nodeLock:         sync.RWMutex{},
 	}
 	return sdn
 }
@@ -193,6 +195,9 @@ func (s *realSDNHTTP) Get(endpoint string, requestBody []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	defer s.close(resp)
+
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -227,21 +232,70 @@ func (s *realSDNHTTP) FetchBlockchainNetwork() error {
 
 // InitGateway fetches all necessary information over HTTP from the SDN
 func (s *realSDNHTTP) InitGateway(protocol string, network string) error {
-	var err error
-	s.nodeModel.Network = network
+	s.nodeLock.Lock()
 	s.nodeModel.Protocol = protocol
+	s.nodeModel.Network = network
+	s.nodeLock.Unlock()
+
 	s.networks = make(message.BlockchainNetworks)
 
-	if err = s.Register(); err != nil {
+	if err := s.Register(); err != nil {
 		return err
 	}
-	if err = s.FetchBlockchainNetwork(); err != nil {
+	if err := s.FetchBlockchainNetwork(); err != nil {
 		return err
 	}
-	err = s.getAccountModel(s.nodeModel.AccountID)
+
+	s.nodeLock.RLock()
+	accountID := s.nodeModel.AccountID
+	s.nodeLock.RUnlock()
+
+	return s.getAccountModel(accountID)
+}
+
+// RotateCertificate checks if the private certificate is expiring within the renewal period and rotates it if needed
+func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
+	expDate, err := s.sslCerts.PrivateCertExpirationDate()
+	if err != nil {
+		return fmt.Errorf("could not get private certificate expiration date: %w", err)
+	}
+
+	if time.Until(expDate) > privateCertRenewalPeriodDays*24*time.Hour {
+		return nil
+	}
+
+	log.Infof("private certificate expiring on %v, rotating certificate", expDate)
+
+	csr, err := s.sslCerts.CreateCSR()
+	if err != nil {
+		return fmt.Errorf("could not create csr for new private certificate: %w", err)
+	}
+
+	s.nodeLock.Lock()
+	s.nodeModel.Csr = string(csr)
+	body := bytes.NewBuffer(s.nodeModel.Pack())
+	s.nodeLock.Unlock()
+
+	resp, err := s.httpWithContext(ctx, s.sdnURL+"/nodes", http.MethodPost, body)
 	if err != nil {
 		return err
 	}
+
+	var newNodeModel message.NodeModel
+
+	if err = json.Unmarshal(resp, &newNodeModel); err != nil {
+		return fmt.Errorf("could not deserialize '%s' response into node model: %w", string(resp), err)
+	}
+
+	err = s.sslCerts.SavePrivateCert(newNodeModel.Cert)
+	if err != nil {
+		return fmt.Errorf("could not save new private certificate: %w", err)
+	}
+
+	s.nodeLock.Lock()
+	s.nodeModel = &newNodeModel
+	s.nodeLock.Unlock()
+
 	return nil
 }
 
@@ -255,7 +309,7 @@ func logLowestLatency(lowestLatencyRelay nodeLatencyInfo) {
 }
 
 // DirectRelayConnections directs the gateway on relays to connect/disconnect
-func (s realSDNHTTP) DirectRelayConnections(relayHosts string, relayLimit uint64, relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) error {
+func (s *realSDNHTTP) DirectRelayConnections(relayHosts string, relayLimit uint64, relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) error {
 	overrideRelays, autoCount, err := parsedCmdlineRelays(relayHosts, relayLimit)
 	if err != nil {
 		return err
@@ -271,9 +325,14 @@ func (s realSDNHTTP) DirectRelayConnections(relayHosts string, relayLimit uint64
 		return nil
 	}
 
+	s.nodeLock.RLock()
+	networkNum := s.nodeModel.BlockchainNetworkNum
+	nodeID := s.nodeModel.NodeID
+	s.nodeLock.RUnlock()
+
 	// TODO: fetching relay from SDN should be done in a loop inside manageAutoRelays
 	// if auto relays specified, start and manage them
-	relays, err := s.getRelays(s.nodeModel.NodeID, s.nodeModel.BlockchainNetworkNum)
+	relays, err := s.getRelays(nodeID, networkNum)
 	if err != nil {
 		return fmt.Errorf("failed to extract relay list: %v", err)
 	}
@@ -284,8 +343,13 @@ func (s realSDNHTTP) DirectRelayConnections(relayHosts string, relayLimit uint64
 	return nil
 }
 
-func (s realSDNHTTP) connectToNewRelay(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) error {
-	relays, err := s.getRelays(s.nodeModel.NodeID, s.nodeModel.BlockchainNetworkNum)
+func (s *realSDNHTTP) connectToNewRelay(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) error {
+	s.nodeLock.RLock()
+	nodeID := s.nodeModel.NodeID
+	networkNum := s.nodeModel.BlockchainNetworkNum
+	s.nodeLock.RUnlock()
+
+	relays, err := s.getRelays(nodeID, networkNum)
 	if err != nil {
 		return fmt.Errorf("failed to extract relay list: %v", err)
 	}
@@ -345,7 +409,7 @@ func parsedCmdlineRelays(relayHosts string, relayLimit uint64) (relayMap, int, e
 	return overrideRelays, autoCount, nil
 }
 
-func (s realSDNHTTP) getAutoConnectedRelays(ignoredRelays IgnoredRelaysMap) map[string]types.RelayInfo {
+func (s *realSDNHTTP) getAutoConnectedRelays(ignoredRelays IgnoredRelaysMap) map[string]types.RelayInfo {
 	connectedAutoRelays := make(map[string]types.RelayInfo)
 	ignoredRelays.Range(func(key string, value types.RelayInfo) bool {
 		if value.IsConnected && !value.IsStatic {
@@ -356,7 +420,7 @@ func (s realSDNHTTP) getAutoConnectedRelays(ignoredRelays IgnoredRelaysMap) map[
 	return connectedAutoRelays
 }
 
-func (s realSDNHTTP) findFastestAvailableRelays(pingLatencies []nodeLatencyInfo, connectedAutoRelays map[string]types.RelayInfo) []nodeLatencyInfo {
+func (s *realSDNHTTP) findFastestAvailableRelays(pingLatencies []nodeLatencyInfo, connectedAutoRelays map[string]types.RelayInfo) []nodeLatencyInfo {
 	fastestAvailableRelays := make([]nodeLatencyInfo, 0)
 
 	for _, pingLatency := range pingLatencies {
@@ -371,7 +435,7 @@ func (s realSDNHTTP) findFastestAvailableRelays(pingLatencies []nodeLatencyInfo,
 	return fastestAvailableRelays
 }
 
-func (s realSDNHTTP) findRelaysToSwitch(connectedAutoRelays map[string]types.RelayInfo, fastestAvailableRelays []nodeLatencyInfo) map[relayToSwitch][]nodeLatencyInfo {
+func (s *realSDNHTTP) findRelaysToSwitch(connectedAutoRelays map[string]types.RelayInfo, fastestAvailableRelays []nodeLatencyInfo) map[relayToSwitch][]nodeLatencyInfo {
 	relaysToSwitch := make(map[relayToSwitch][]nodeLatencyInfo) // map[oldIP and Port][]newRelayNodeLatencyInfo
 
 OuterLoop:
@@ -402,8 +466,13 @@ func convertMapToSortedSlice(connectedAutoRelays map[string]types.RelayInfo) []a
 	return relaySlice
 }
 
-func (s realSDNHTTP) FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) {
-	relays, err := s.getRelays(s.nodeModel.NodeID, s.nodeModel.BlockchainNetworkNum)
+func (s *realSDNHTTP) FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap) {
+	s.nodeLock.RLock()
+	nodeID := s.nodeModel.NodeID
+	networkNum := s.nodeModel.BlockchainNetworkNum
+	s.nodeLock.RUnlock()
+
+	relays, err := s.getRelays(nodeID, networkNum)
 	if err != nil {
 		log.Errorf("failed to extract relyInfo list: %v", err)
 		return
@@ -422,7 +491,7 @@ func (s realSDNHTTP) FindFastestRelays(relayInstructions chan<- RelayInstruction
 	}
 }
 
-func (s realSDNHTTP) manageAutoRelays(autoRelayCount int, relayInstructions chan<- RelayInstruction, relays message.Peers, ignoredRelays IgnoredRelaysMap) {
+func (s *realSDNHTTP) manageAutoRelays(autoRelayCount int, relayInstructions chan<- RelayInstruction, relays message.Peers, ignoredRelays IgnoredRelaysMap) {
 	pingLatencies := s.getPingLatencies(relays) // list of SDN relays sorted by ascending order of latency
 	if len(pingLatencies) == 0 {
 		log.Errorf("ping latencies not found for relays from SDN")
@@ -454,7 +523,7 @@ func (s realSDNHTTP) manageAutoRelays(autoRelayCount int, relayInstructions chan
 	log.Errorf("available SDN relays %v; requested auto count %v", autoRelayCounter, autoRelayCount)
 }
 
-func (s realSDNHTTP) FindNewRelay(ctx context.Context, oldRelayIP string, oldRelayIPPort int64, relayInstructions chan RelayInstruction, ignoredRelays IgnoredRelaysMap) {
+func (s *realSDNHTTP) FindNewRelay(ctx context.Context, oldRelayIP string, oldRelayIPPort int64, relayInstructions chan RelayInstruction, ignoredRelays IgnoredRelaysMap) {
 	log.Errorf("relay %v is not reachable, switching relay", oldRelayIP)
 	ignoredRelays.Store(oldRelayIP, types.RelayInfo{TimeAdded: time.Now(), Port: oldRelayIPPort, IsConnected: false})
 	for {
@@ -473,26 +542,32 @@ func (s realSDNHTTP) FindNewRelay(ctx context.Context, oldRelayIP string, oldRel
 }
 
 // NodeModel returns the node model returned by the SDN
-func (s realSDNHTTP) NodeModel() *message.NodeModel {
+func (s *realSDNHTTP) NodeModel() *message.NodeModel {
+	s.nodeLock.RLock()
+	defer s.nodeLock.RUnlock()
+
 	return s.nodeModel
 }
 
 // AccountTier returns the account tier name
-func (s realSDNHTTP) AccountTier() message.AccountTier {
+func (s *realSDNHTTP) AccountTier() message.AccountTier {
 	return s.accountModel.TierName
 }
 
 // AccountModel returns the account model
-func (s realSDNHTTP) AccountModel() message.Account {
+func (s *realSDNHTTP) AccountModel() message.Account {
 	return *s.accountModel
 }
 
 // NetworkNum returns the registered network number of the node model
-func (s realSDNHTTP) NetworkNum() types.NetworkNum {
+func (s *realSDNHTTP) NetworkNum() types.NetworkNum {
+	s.nodeLock.RLock()
+	defer s.nodeLock.RUnlock()
+
 	return s.nodeModel.BlockchainNetworkNum
 }
 
-func (s realSDNHTTP) httpClient() (*http.Client, error) {
+func (s *realSDNHTTP) httpClient() (*http.Client, error) {
 	var tlsConfig *tls.Config
 	var err error
 	if s.sslCerts.NeedsPrivateCert() {
@@ -523,7 +598,9 @@ func (s *realSDNHTTP) Register() error {
 		if err != nil {
 			return err
 		}
+		s.nodeLock.Lock()
 		s.nodeModel.Csr = string(csr)
+		s.nodeLock.Unlock()
 	} else {
 		nodeID, err := s.sslCerts.GetNodeID()
 		if err != nil {
@@ -532,17 +609,28 @@ func (s *realSDNHTTP) Register() error {
 		s.nodeID = nodeID
 	}
 
-	if s.nodeModel.NodeID != "" {
-		log.Debugf("registering SDN for %s with node ID '%v' and version '%v'", s.nodeModel.NodeType, s.nodeModel.NodeID, s.nodeModel.SourceVersion)
+	s.nodeLock.RLock()
+	nodeType := s.nodeModel.NodeType
+	nodeModelNodeID := s.nodeModel.NodeID
+	srcVersion := s.nodeModel.SourceVersion
+	externalIP := s.nodeModel.ExternalIP
+	packed := bytes.NewBuffer(s.nodeModel.Pack())
+	s.nodeLock.RUnlock()
+
+	if nodeModelNodeID != "" {
+		log.Debugf("registering SDN for %s with node ID '%v' and version '%v'", nodeType, nodeModelNodeID, srcVersion)
 	} else {
-		log.Debugf("registering SDN for %s with IP '%v' and version '%v'", s.nodeModel.NodeType, s.nodeModel.ExternalIP, s.nodeModel.SourceVersion)
+		log.Debugf("registering SDN for %s with IP '%v' and version '%v'", nodeType, externalIP, srcVersion)
 	}
 
-	resp, err := s.httpWithCache(s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, bytes.NewBuffer(s.nodeModel.Pack()))
+	resp, err := s.httpWithCache(s.sdnURL+"/nodes", http.MethodPost, nodeModelCacheFileName, packed)
 	if err != nil {
 		return err
 	}
-	if err = json.Unmarshal(resp, &s.nodeModel); err != nil {
+
+	var newNodeModel message.NodeModel
+
+	if err = json.Unmarshal(resp, &newNodeModel); err != nil {
 		return fmt.Errorf("could not deserialize '%s' response into node model: %v", string(resp), err)
 	}
 	accountID, err := s.sslCerts.GetAccountID()
@@ -550,11 +638,15 @@ func (s *realSDNHTTP) Register() error {
 		return err
 	}
 
-	s.nodeID = s.nodeModel.NodeID
+	s.nodeLock.Lock()
+	s.nodeModel = &newNodeModel
+	s.nodeID = newNodeModel.NodeID
 	s.accountID = accountID
+	newCert := newNodeModel.Cert
+	s.nodeLock.Unlock()
 
 	if s.sslCerts.NeedsPrivateCert() {
-		err := s.sslCerts.SavePrivateCert(s.nodeModel.Cert)
+		err := s.sslCerts.SavePrivateCert(newCert)
 		// should pretty much never happen unless there are SDN problems, in which
 		// case just abort on startup
 		if err != nil {
@@ -613,7 +705,7 @@ func (s *realSDNHTTP) getAccountModelWithEndpoint(accountID types.AccountID, end
 	case "account":
 		resp, err = s.httpWithCache(url, http.MethodGet, accountModelsFileName, nil)
 	default:
-		log.Panicf("getAccountModelWithEndpoint called with unsuppored endpoint %v", endpoint)
+		log.Panicf("getAccountModelWithEndpoint called with unsupported endpoint %v", endpoint)
 	}
 
 	if err != nil {
@@ -658,8 +750,12 @@ func (s *realSDNHTTP) getRelays(nodeID types.NodeID, networkNum types.NetworkNum
 }
 
 func (s *realSDNHTTP) httpWithCache(uri string, method string, fileName string, body io.Reader) ([]byte, error) {
+	return s.httpWithCacheAndContext(context.Background(), uri, method, fileName, body)
+}
+
+func (s *realSDNHTTP) httpWithCacheAndContext(ctx context.Context, uri string, method string, fileName string, body io.Reader) ([]byte, error) {
 	var err error
-	data, httpErr := s.http(uri, method, body)
+	data, httpErr := s.httpWithContext(ctx, uri, method, body)
 	if httpErr != nil {
 		if errors.Is(httpErr, ErrSDNUnavailable) {
 			// we can't get the data from http - try to read from cache file
@@ -682,6 +778,10 @@ func (s *realSDNHTTP) httpWithCache(uri string, method string, fileName string, 
 }
 
 func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, error) {
+	return s.httpWithContext(context.Background(), uri, method, body)
+}
+
+func (s *realSDNHTTP) httpWithContext(ctx context.Context, uri string, method string, body io.Reader) ([]byte, error) {
 	client, err := s.httpClient()
 	if err != nil {
 		return nil, err
@@ -693,7 +793,7 @@ func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, e
 		}
 	}()
 
-	req, err := http.NewRequest(method, uri, body)
+	req, err := http.NewRequestWithContext(ctx, method, uri, body)
 	if err != nil {
 		return nil, err
 	}
@@ -769,39 +869,44 @@ func (s *realSDNHTTP) MinTxAge() time.Duration {
 
 // getPingLatencies pings list of SDN peers and returns sorted list of nodeLatencyInfo for each successful peer ping
 func getPingLatencies(peers message.Peers) []nodeLatencyInfo {
-	potentialRelaysCount := len(peers)
-	pingResults := make([]nodeLatencyInfo, potentialRelaysCount)
 	var wg sync.WaitGroup
-	wg.Add(potentialRelaysCount)
+	resultsChan := make(chan nodeLatencyInfo, len(peers))
 
-	for peerCount, peer := range peers {
-		pingResults[peerCount] = nodeLatencyInfo{peer.IP, peer.Port, PingTimeout}
-		go func(pingResult *nodeLatencyInfo) {
+	for _, peer := range peers {
+		wg.Add(1)
+		go func(p message.Peer) {
 			defer wg.Done()
-			cmd := exec.Command("ping", (*pingResult).IP, "-c1", "-W2")
-			var out bytes.Buffer
-			var stderr bytes.Buffer
-			cmd.Stdout = &out
-			cmd.Stderr = &stderr
-			if err := cmd.Run(); err != nil {
-				log.Errorf("error executing (%v) %v: %v", cmd, err, stderr)
+
+			address := net.JoinHostPort(p.IP, strconv.FormatInt(p.Port, 10))
+
+			start := time.Now()
+			conn, err := net.DialTimeout("tcp", address, time.Duration(PingTimeout)*time.Millisecond)
+			duration := time.Since(start)
+
+			if err != nil {
+				resultsChan <- nodeLatencyInfo{IP: p.IP, Port: p.Port, Latency: 999999.0}
 				return
 			}
-			log.Tracef("ping results from %v: %q", (*pingResult).IP, out)
-			re := regexp.MustCompile(TimeRegEx)
-			latencyTimeList := re.FindStringSubmatch(out.String())
-			if len(latencyTimeList) > 0 {
-				latencyTime, _ := strconv.ParseFloat(latencyTimeList[1], 64)
-				if latencyTime > 0 {
-					(*pingResult).Latency = latencyTime
-				}
-			}
-		}(&pingResults[peerCount])
-	}
-	wg.Wait()
+			conn.Close()
 
-	sort.Slice(pingResults, func(i int, j int) bool { return pingResults[i].Latency < pingResults[j].Latency })
-	log.Infof("latency results for potential relays: %v", pingResults)
+			// convert duration to milliseconds
+			latencyMs := float64(duration.Microseconds()) / 1000.0
+			resultsChan <- nodeLatencyInfo{IP: p.IP, Port: p.Port, Latency: latencyMs}
+		}(peer)
+	}
+
+	wg.Wait()
+	close(resultsChan)
+
+	var pingResults []nodeLatencyInfo
+	for res := range resultsChan {
+		pingResults = append(pingResults, res)
+	}
+
+	sort.Slice(pingResults, func(i, j int) bool {
+		return pingResults[i].Latency < pingResults[j].Latency
+	})
+
 	return pingResults
 }
 
@@ -870,24 +975,4 @@ func (s *realSDNHTTP) RemoveInternalGatewaySubscription(accountID types.AccountI
 		return fmt.Errorf("could not send request to remove internal gateway subscription: %w", err)
 	}
 	return nil
-}
-
-var (
-	errAuthHeaderNotBase65   = errors.New("auth header is not base64 encoded")
-	errAuthHeaderWrongFormat = errors.New("account_id and hash could not be generated from auth header")
-)
-
-// GetAccountIDSecretHashFromHeader extracts accountID and secret values from an authorization header
-func GetAccountIDSecretHashFromHeader(authHeader string) (types.AccountID, string, error) {
-	payload, err := base64.StdEncoding.DecodeString(authHeader)
-	if err != nil {
-		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderNotBase65, authHeader)
-	}
-	accountIDAndHash := strings.SplitN(string(payload), ":", 2)
-	if len(accountIDAndHash) <= 1 {
-		return "", "", fmt.Errorf("%w:, %v", errAuthHeaderWrongFormat, authHeader)
-	}
-	accountID := types.AccountID(accountIDAndHash[0])
-	secretHash := accountIDAndHash[1]
-	return accountID, secretHash, nil
 }

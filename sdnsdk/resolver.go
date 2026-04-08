@@ -3,7 +3,7 @@ package sdnsdk
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 
@@ -55,7 +55,7 @@ func (*PublicIPResolver) GetPublicIP() (string, error) {
 		}
 	}()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", err
 	}

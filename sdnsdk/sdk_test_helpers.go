@@ -2,7 +2,6 @@ package sdnsdk
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"time"
@@ -46,14 +45,14 @@ const (
 )
 
 // SetupTestCerts uses the test certs specified in constants to return an utils.SSLCerts object for connection testing
-func SetupTestCerts() cert.SSLCerts {
+func SetupTestCerts() *cert.SSLCerts {
 	defer CleanupSSLCerts()
 	SetupSSLFiles("test")
 	return NewTestCertsWithoutSetup()
 }
 
 // NewTestCertsWithoutSetup uses the test certs specified in constants to return an utils.SSLCerts object for connection testing. This function does not do any setup/teardown of writing said files temporarily to disk.
-func NewTestCertsWithoutSetup() cert.SSLCerts {
+func NewTestCertsWithoutSetup() *cert.SSLCerts {
 	return cert.NewSSLCerts(SSLTestPath, SSLTestPath, "test")
 }
 
@@ -70,7 +69,7 @@ func SetupCAFiles() {
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(CACertPath, []byte(CACert), 0644)
+	err = os.WriteFile(CACertPath, []byte(CACert), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -106,14 +105,14 @@ func makeFolders(name string) {
 
 func writeCerts(folder, name, cert, key string) {
 	p := path.Join(SSLTestPath, name, folder)
-	keyPath := path.Join(p, fmt.Sprintf("%v_cert.pem", name))
-	certPath := path.Join(p, fmt.Sprintf("%v_key.pem", name))
+	certPath := path.Join(p, fmt.Sprintf("%v_cert.pem", name))
+	keyPath := path.Join(p, fmt.Sprintf("%v_key.pem", name))
 
-	err := ioutil.WriteFile(keyPath, []byte(cert), 0644)
+	err := os.WriteFile(certPath, []byte(cert), 0644)
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(certPath, []byte(key), 0644)
+	err = os.WriteFile(keyPath, []byte(key), 0644)
 	if err != nil {
 		panic(err)
 	}
