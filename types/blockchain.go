@@ -26,6 +26,8 @@ const HyperliquidMainnet = "Hyperliquid-Mainnet"
 
 const MonadMainnet = "Monad-Mainnet"
 
+const PolygonMainnet = "Polygon-Mainnet"
+
 // MainnetNum - for Ethereum main net blockchain network number
 const MainnetNum NetworkNum = 5
 
@@ -45,6 +47,8 @@ const HyperliquidChainID = 999
 
 const MonadChainID = 143
 
+const PolygonChainID = 137
+
 // EthChainID - eth chain ID
 const EthChainID NetworkID = 1
 
@@ -60,6 +64,8 @@ const XLayerMainnetNum NetworkNum = 567
 const HyperliquidNum NetworkNum = 999
 
 const MonadMainnetNum NetworkNum = 143
+
+const PolygonMainnetNum NetworkNum = 137
 
 // BSCTestnetNum - for BSC-Testnet blockchain network number
 const BSCTestnetNum NetworkNum = 42
@@ -77,29 +83,32 @@ var BlockchainNetworkToNetworkNum = map[string]NetworkNum{
 	XLayerMainnet:      XLayerMainnetNum,
 	HyperliquidMainnet: HyperliquidNum,
 	MonadMainnet:       MonadMainnetNum,
+	PolygonMainnet:     PolygonMainnetNum,
 }
 
 // NetworkNumToChainID - Mapping from networkNum to chainID
 var NetworkNumToChainID = map[NetworkNum]NetworkID{
-	MainnetNum:       EthChainID,
-	BSCMainnetNum:    BSCChainID,
-	HoleskyNum:       HoleskyChainID,
-	BaseMainnetNum:   BaseChainID,
-	XLayerMainnetNum: XLayerChainID,
-	HyperliquidNum:   HyperliquidChainID,
-	MonadMainnetNum:  MonadChainID,
+	MainnetNum:        EthChainID,
+	BSCMainnetNum:     BSCChainID,
+	HoleskyNum:        HoleskyChainID,
+	BaseMainnetNum:    BaseChainID,
+	XLayerMainnetNum:  XLayerChainID,
+	HyperliquidNum:    HyperliquidChainID,
+	MonadMainnetNum:   MonadChainID,
+	PolygonMainnetNum: PolygonChainID,
 }
 
 // NetworkNumToBlockchainNetwork - Mapping from networkNum to blockchain network
 var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
-	MainnetNum:       Mainnet,
-	BSCMainnetNum:    BSCMainnet,
-	BSCTestnetNum:    BSCTestnet,
-	HoleskyNum:       Holesky,
-	BaseMainnetNum:   BaseMainnet,
-	XLayerMainnetNum: XLayerMainnet,
-	HyperliquidNum:   HyperliquidMainnet,
-	MonadMainnetNum:  MonadMainnet,
+	MainnetNum:        Mainnet,
+	BSCMainnetNum:     BSCMainnet,
+	BSCTestnetNum:     BSCTestnet,
+	HoleskyNum:        Holesky,
+	BaseMainnetNum:    BaseMainnet,
+	XLayerMainnetNum:  XLayerMainnet,
+	HyperliquidNum:    HyperliquidMainnet,
+	MonadMainnetNum:   MonadMainnet,
+	PolygonMainnetNum: PolygonMainnet,
 }
 
 var (
