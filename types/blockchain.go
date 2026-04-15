@@ -28,6 +28,8 @@ const MonadMainnet = "Monad-Mainnet"
 
 const PolygonMainnet = "Polygon-Mainnet"
 
+const PolygonAmoy = "Polygon-Amoy"
+
 // MainnetNum - for Ethereum main net blockchain network number
 const MainnetNum NetworkNum = 5
 
@@ -49,6 +51,8 @@ const MonadChainID = 143
 
 const PolygonChainID = 137
 
+const PolygonAmoyChainID = 80002
+
 // EthChainID - eth chain ID
 const EthChainID NetworkID = 1
 
@@ -67,6 +71,8 @@ const MonadMainnetNum NetworkNum = 143
 
 const PolygonMainnetNum NetworkNum = 137
 
+const PolygonAmoyNum NetworkNum = 80002
+
 // BSCTestnetNum - for BSC-Testnet blockchain network number
 const BSCTestnetNum NetworkNum = 42
 
@@ -84,6 +90,7 @@ var BlockchainNetworkToNetworkNum = map[string]NetworkNum{
 	HyperliquidMainnet: HyperliquidNum,
 	MonadMainnet:       MonadMainnetNum,
 	PolygonMainnet:     PolygonMainnetNum,
+	PolygonAmoy:        PolygonAmoyNum,
 }
 
 // NetworkNumToChainID - Mapping from networkNum to chainID
@@ -96,6 +103,7 @@ var NetworkNumToChainID = map[NetworkNum]NetworkID{
 	HyperliquidNum:    HyperliquidChainID,
 	MonadMainnetNum:   MonadChainID,
 	PolygonMainnetNum: PolygonChainID,
+	PolygonAmoyNum:    PolygonAmoyChainID,
 }
 
 // NetworkNumToBlockchainNetwork - Mapping from networkNum to blockchain network
@@ -109,6 +117,7 @@ var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
 	HyperliquidNum:    HyperliquidMainnet,
 	MonadMainnetNum:   MonadMainnet,
 	PolygonMainnetNum: PolygonMainnet,
+	PolygonAmoyNum:    PolygonMainnet,
 }
 
 var (
