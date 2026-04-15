@@ -117,7 +117,7 @@ var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
 	HyperliquidNum:    HyperliquidMainnet,
 	MonadMainnetNum:   MonadMainnet,
 	PolygonMainnetNum: PolygonMainnet,
-	PolygonAmoyNum:    PolygonMainnet,
+	PolygonAmoyNum:    PolygonAmoy,
 }
 
 var (
