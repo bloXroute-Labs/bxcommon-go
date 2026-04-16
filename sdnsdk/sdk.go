@@ -628,21 +628,19 @@ func (s *realSDNHTTP) Register() error {
 		return err
 	}
 
-	var newNodeModel message.NodeModel
-
-	if err = json.Unmarshal(resp, &newNodeModel); err != nil {
-		return fmt.Errorf("could not deserialize '%s' response into node model: %v", string(resp), err)
-	}
 	accountID, err := s.sslCerts.GetAccountID()
 	if err != nil {
 		return err
 	}
 
 	s.nodeLock.Lock()
-	s.nodeModel = &newNodeModel
-	s.nodeID = newNodeModel.NodeID
+	if err = json.Unmarshal(resp, s.nodeModel); err != nil {
+		s.nodeLock.Unlock()
+		return fmt.Errorf("could not deserialize '%s' response into node model: %v", string(resp), err)
+	}
+	s.nodeID = s.nodeModel.NodeID
 	s.accountID = accountID
-	newCert := newNodeModel.Cert
+	newCert := s.nodeModel.Cert
 	s.nodeLock.Unlock()
 
 	if s.sslCerts.NeedsPrivateCert() {
