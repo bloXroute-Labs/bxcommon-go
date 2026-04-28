@@ -1217,7 +1217,7 @@ func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 	sslCerts := cert.NewSSLCerts(SSLTestPath, SSLTestPath, certName)
 
 	// Sanity check expiration is within renewal period
-	exp, err := sslCerts.PrivateCertExpirationDate()
+	exp, err := sslCerts.RegistrationOnlyCertExpirationDate()
 	require.NoError(t, err, "failed to get private cert expiration date")
 	assert.False(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is not within renewal window")
 
@@ -1306,7 +1306,7 @@ func TestRotateCertificate_NoopWhenNotWithinRenewalWindow(t *testing.T) {
 	sslCerts := cert.NewSSLCerts(SSLTestPath, SSLTestPath, certName)
 
 	// sanity check expiration is NOT within renewal period
-	exp, err := sslCerts.PrivateCertExpirationDate()
+	exp, err := sslCerts.RegistrationOnlyCertExpirationDate()
 	require.NoError(t, err, "failed to get private cert expiration date")
 	require.True(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is within renewal window")
 

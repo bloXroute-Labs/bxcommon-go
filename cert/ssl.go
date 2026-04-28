@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"sync"
@@ -203,6 +204,25 @@ func (s *SSLCerts) CreateCSR() ([]byte, error) {
 	return serializedCR, nil
 }
 
+// CreateRegistrationCSR returns a PEM encoded x509.CertificateRequest, generated using the registration-only private key
+func (s *SSLCerts) CreateRegistrationCSR() ([]byte, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	certRequest := x509.CertificateRequest{
+		Subject:    s.registrationOnlyCert.Subject,
+		Extensions: s.registrationOnlyCert.Extensions,
+	}
+
+	x509CR, err := x509.CreateCertificateRequest(rand.Reader, &certRequest, &s.registrationOnlyKey)
+	if err != nil {
+		return nil, err
+	}
+	serializedCR := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: x509CR})
+
+	return serializedCR, nil
+}
+
 // SerializeRegistrationCert returns the PEM encoded registration x509.Certificate
 func (s *SSLCerts) SerializeRegistrationCert() ([]byte, error) {
 	s.lock.Lock()
@@ -239,6 +259,42 @@ func (s *SSLCerts) SavePrivateCert(privateCert string) error {
 	s.privateKeyPair = &privateKeyPair
 
 	return os.WriteFile(s.privateCertFile, privateCertBytes, 0644)
+}
+
+func (s *SSLCerts) SaveRegistrationOnlyCert(registrationOnlyCert string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if len(registrationOnlyCert) == 0 {
+		return errors.New("registration only cert string is empty")
+	}
+
+	registrationOnlyCertBytes := []byte(registrationOnlyCert)
+	cert, err := parsePEMCert(registrationOnlyCertBytes)
+	if err != nil {
+		return fmt.Errorf("could not parse registration only cert: %v", err)
+	}
+
+	registrationOnlyKeyBytes, err := x509.MarshalECPrivateKey(&s.registrationOnlyKey)
+	if err != nil {
+		return fmt.Errorf("stored registration only key was somehow invalid: %v", err)
+	}
+	registrationOnlyKeyBlock := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: registrationOnlyKeyBytes})
+	registrationOnlyKeyPair, err := tls.X509KeyPair(registrationOnlyCertBytes, registrationOnlyKeyBlock)
+	if err != nil {
+		return fmt.Errorf("could not parse registration only key pair: %v", err)
+	}
+
+	err = os.WriteFile(s.registrationOnlyCertFile+".old", s.registrationOnlyCertBlock, 0644)
+	if err != nil {
+		log.Printf("could not create backup of old registration only cert: %v", err)
+	}
+
+	s.registrationOnlyKeyPair = registrationOnlyKeyPair
+	s.registrationOnlyCert = *cert
+	s.registrationOnlyCertBlock = registrationOnlyCertBytes
+
+	return os.WriteFile(s.registrationOnlyCertFile, registrationOnlyCertBytes, 0644)
 }
 
 // LoadPrivateConfig generates TLS config from the private certificates.
@@ -345,14 +401,15 @@ func (s *SSLCerts) PrivateKeyFile() string {
 	return s.privateKeyFile
 }
 
-func (s *SSLCerts) PrivateCertExpirationDate() (time.Time, error) {
+// RegistrationOnlyCertExpirationDate return cert expiration date of registration only cert
+func (s *SSLCerts) RegistrationOnlyCertExpirationDate() (time.Time, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if s.privateCert == nil {
+	if s.registrationOnlyCert.Raw == nil {
 		return time.Time{}, errors.New("private certificate has not been loaded")
 	}
 
-	return s.privateCert.NotAfter, nil
+	return s.registrationOnlyCert.NotAfter, nil
 
 }

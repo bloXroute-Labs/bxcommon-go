@@ -126,6 +126,12 @@ type QuotaRequestBody struct {
 	AccountID string `json:"account_id"`
 }
 
+// RotateCertificateRequestBody is the request body for rotating a registration-only certificate
+type RotateCertificateRequestBody struct {
+	AccountID types.AccountID `json:"account_id"`
+	CSR       string          `json:"csr"`
+}
+
 // QuotaResponseBody quota usage response body
 type QuotaResponseBody struct {
 	AccountID   string `json:"account_id"`
@@ -255,7 +261,7 @@ func (s *realSDNHTTP) InitGateway(protocol string, network string) error {
 
 // RotateCertificate checks if the private certificate is expiring within the renewal period and rotates it if needed
 func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
-	expDate, err := s.sslCerts.PrivateCertExpirationDate()
+	expDate, err := s.sslCerts.RegistrationOnlyCertExpirationDate()
 	if err != nil {
 		return fmt.Errorf("could not get private certificate expiration date: %w", err)
 	}
@@ -264,19 +270,24 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 		return nil
 	}
 
-	log.Infof("private certificate expiring on %v, rotating certificate", expDate)
+	log.Infof("private registration-only certificate expiring on %v, rotating", expDate)
 
-	csr, err := s.sslCerts.CreateCSR()
+	csr, err := s.sslCerts.CreateRegistrationCSR()
 	if err != nil {
 		return fmt.Errorf("could not create csr for new private certificate: %w", err)
 	}
 
-	s.nodeLock.Lock()
-	s.nodeModel.Csr = string(csr)
-	body := bytes.NewBuffer(s.nodeModel.Pack())
-	s.nodeLock.Unlock()
+	req := RotateCertificateRequestBody{
+		CSR:       string(csr),
+		AccountID: s.nodeModel.AccountID,
+	}
 
-	resp, err := s.httpWithContext(ctx, s.sdnURL+"/nodes", http.MethodPost, body)
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("could not serialize request body: %w", err)
+	}
+
+	resp, err := s.httpWithContext(ctx, s.sdnURL+"/accounts/rotate-cert", http.MethodPatch, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -287,7 +298,7 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 		return fmt.Errorf("could not deserialize '%s' response into node model: %w", string(resp), err)
 	}
 
-	err = s.sslCerts.SavePrivateCert(newNodeModel.Cert)
+	err = s.sslCerts.SaveRegistrationOnlyCert(newNodeModel.Cert)
 	if err != nil {
 		return fmt.Errorf("could not save new private certificate: %w", err)
 	}
