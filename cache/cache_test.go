@@ -3,13 +3,14 @@ package cache
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/bloXroute-Labs/bxcommon-go/clock"
 	"github.com/bloXroute-Labs/bxcommon-go/syncmap"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 )
 
 func TestCache_Get(t *testing.T) {
@@ -68,7 +69,7 @@ func TestCache_Get(t *testing.T) {
 }
 
 func TestCache_ConcurrentGet(t *testing.T) {
-	counter := atomic.NewInt32(0)
+	var counter atomic.Int32
 
 	clock := &clock.MockClock{}
 
@@ -76,7 +77,7 @@ func TestCache_ConcurrentGet(t *testing.T) {
 	cache := newCache[string, int](syncmap.StringHasher, func(key string) (*int, error) {
 		switch key {
 		case "key1":
-			counter.Inc()
+			counter.Add(1)
 
 			if counter.Load() > 1 {
 				require.FailNow(t, "unexpected call")
