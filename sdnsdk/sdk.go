@@ -132,6 +132,11 @@ type RotateCertificateRequestBody struct {
 	CSR       string          `json:"csr"`
 }
 
+// NewCertificateResponse is the response body for rotating a registration-only certificate
+type NewCertificateResponse struct {
+	Certificate string `json:"certificate"`
+}
+
 // QuotaResponseBody quota usage response body
 type QuotaResponseBody struct {
 	AccountID   string `json:"account_id"`
@@ -266,9 +271,9 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 		return fmt.Errorf("could not get private certificate expiration date: %w", err)
 	}
 
-	if time.Until(expDate) > privateCertRenewalPeriodDays*24*time.Hour {
+	/*if time.Until(expDate) > privateCertRenewalPeriodDays*24*time.Hour {
 		return nil
-	}
+	}*/
 
 	log.Infof("private registration-only certificate expiring on %v, rotating", expDate)
 
@@ -292,20 +297,16 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 		return err
 	}
 
-	var newNodeModel message.NodeModel
+	var newCert NewCertificateResponse
 
-	if err = json.Unmarshal(resp, &newNodeModel); err != nil {
+	if err = json.Unmarshal(resp, &newCert); err != nil {
 		return fmt.Errorf("could not deserialize '%s' response into node model: %w", string(resp), err)
 	}
 
-	err = s.sslCerts.SaveRegistrationOnlyCert(newNodeModel.Cert)
+	err = s.sslCerts.SaveRegistrationOnlyCert(newCert.Certificate)
 	if err != nil {
 		return fmt.Errorf("could not save new private certificate: %w", err)
 	}
-
-	s.nodeLock.Lock()
-	s.nodeModel = &newNodeModel
-	s.nodeLock.Unlock()
 
 	return nil
 }
