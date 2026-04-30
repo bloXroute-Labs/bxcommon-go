@@ -271,9 +271,9 @@ func (s *realSDNHTTP) RotateCertificate(ctx context.Context) error {
 		return fmt.Errorf("could not get private certificate expiration date: %w", err)
 	}
 
-	/*if time.Until(expDate) > privateCertRenewalPeriodDays*24*time.Hour {
+	if time.Until(expDate) > privateCertRenewalPeriodDays*24*time.Hour {
 		return nil
-	}*/
+	}
 
 	log.Infof("private registration-only certificate expiring on %v, rotating", expDate)
 
