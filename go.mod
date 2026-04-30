@@ -7,9 +7,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/puzpuzpuz/xsync/v2 v2.5.1
-	github.com/rs/zerolog v1.35.0
+	github.com/rs/zerolog v1.35.1
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/atomic v1.11.0
 	google.golang.org/grpc v1.80.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )

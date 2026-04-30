@@ -2,7 +2,6 @@ package cache
 
 import (
 	"bufio"
-	"io"
 	"os"
 	"path"
 	"time"
@@ -33,13 +32,8 @@ func UpdateCacheFile(dataDir string, fileName string, value []byte) error {
 // LoadCacheFile - load a cache file
 func LoadCacheFile(dataDir string, fileName string) ([]byte, error) {
 	cacheFileName := path.Join(dataDir, fileName)
-	f, err := os.Open(cacheFileName)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
 
-	return io.ReadAll(bufio.NewReader(f))
+	return os.ReadFile(cacheFileName)
 }
 
 type value[V any] struct {
@@ -105,6 +99,14 @@ func (c *Cache[K, V]) Get(key K) (item *V, err error) {
 	}
 
 	return
+}
+
+// Store stores the provided value for the provided key
+func (c *Cache[K, V]) Store(key K, item *V) {
+	c.cacheMap.Store(key, value[*V]{
+		item: item,
+		exp:  c.clock.Now().Add(c.expDur),
+	})
 }
 
 func (c *Cache[K, V]) getAndStore(key K) (*V, error) {
