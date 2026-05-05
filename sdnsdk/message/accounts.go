@@ -340,10 +340,11 @@ type Account struct {
 	BaseBoosterNetwork             BDNBasicService `json:"base_booster_network"`
 	BaseStateDiffStreaming         BDNQuotaService `json:"base_state_diff_streaming"`
 
-	OnlineSolanaGateways   BDNQuotaService `json:"online_solana_gateways"`
-	SolanaShredStreams     BDNQuotaService `json:"solana_shred_streams"`
-	SolanaTxStreamers      BDNQuotaService `json:"solana_tx_streamers"`
-	SolanaTraderApiCredits BDNQuotaService `json:"solana_trader_api_credits"`
+	OnlineSolanaGateways       BDNQuotaService            `json:"online_solana_gateways"`
+	SolanaShredStreams         BDNQuotaService            `json:"solana_shred_streams"`
+	SolanaRegionalShredStreams map[string]BDNQuotaService `json:"solana_regional_shred_streams"`
+	SolanaTxStreamers          BDNQuotaService            `json:"solana_tx_streamers"`
+	SolanaTraderApiCredits     BDNQuotaService            `json:"solana_trader_api_credits"`
 
 	// TxTool
 	TxTraceRateLimitation     BDNQuotaService `json:"tx_trace_rate_limitation"`
