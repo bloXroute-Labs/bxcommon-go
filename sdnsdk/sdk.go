@@ -71,7 +71,7 @@ type SDNHTTP interface {
 	FindNewRelay(ctx context.Context, oldRelayIP string, oldRelayIPPort int64, relayInstructions chan RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	RotateCertificate(ctx context.Context) error
-	GetSubmissionStatus(accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error)
+	GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error)
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -143,9 +143,7 @@ type QuotaResponseBody struct {
 }
 
 type SubmissionStatus struct {
-	AccountID        types.AccountID `json:"account_id"`
-	CheckTime        time.Time       `json:"check_time"`
-	SubmissionStatus bool            `json:"submission_status"`
+	SubmissionStatus bool `json:"submission_status"`
 }
 
 type relayToSwitch struct {
@@ -964,12 +962,13 @@ var networkNumToSubmissionStatusEndpoint = map[types.NetworkNum]string{
 	types.PolygonMainnetNum: "polygon",
 }
 
-func (s *realSDNHTTP) GetSubmissionStatus(accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error) {
+func (s *realSDNHTTP) GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error) {
 	url := fmt.Sprintf("%v/accounts/%v/submission-status/%v", s.sdnURL, accountID, networkNumToSubmissionStatusEndpoint[networkNum])
-	resp, err := s.http(url, http.MethodGet, nil)
+	resp, err := s.httpWithContext(ctx, url, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	var submissionStatus SubmissionStatus
 	if err = json.Unmarshal(resp, &submissionStatus); err != nil {
 		return nil, fmt.Errorf("could not deserialize '%s' response into potential relays: %v", string(resp), err)
