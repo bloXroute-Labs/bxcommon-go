@@ -560,6 +560,33 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			},
 			ExpireDateTime: now.Add(time.Hour),
 		},
+		PrivateOrdersStreaming: BDNFeedService{
+			ExpireDate: now.AddDate(0, 0, 1).Format("2006-01-02"),
+			Feed: FeedProperties{
+				AllowFiltering:  true,
+				AvailableFields: []string{"all"},
+				Plan:            SubscriptionPlanFeeds,
+				Limit:           20,
+			},
+		},
+		PendingPrivateTxsStreaming: BDNFeedService{
+			ExpireDate: now.AddDate(0, 0, 1).Format("2006-01-02"),
+			Feed: FeedProperties{
+				AllowFiltering:  true,
+				AvailableFields: []string{"all"},
+				Plan:            SubscriptionPlanFeeds,
+				Limit:           20,
+			},
+		},
+		MEVProposerGetHeaderStreaming: BDNFeedService{
+			ExpireDate: now.AddDate(0, 0, 1).Format("2006-01-02"),
+			Feed: FeedProperties{
+				AllowFiltering:  true,
+				AvailableFields: []string{"all"},
+				Plan:            SubscriptionPlanFeeds,
+				Limit:           20,
+			},
+		},
 		SecretHash: "",
 		EthValidatorGateway: BDNQuotaService{
 			MsgQuota: BDNService{
