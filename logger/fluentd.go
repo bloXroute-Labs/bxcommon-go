@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -46,13 +47,20 @@ func fluentDWriter(fluentDHost string, level zerolog.Level) (*levelWriter, error
 	w := newWriter(io.Discard, true)
 	// use formatter to send logs to fluentd
 	w.FormatPrepare = func(m map[string]interface{}) error {
-		// FormatPrepare is called before FormatTimestamp, thus using standard time format to parse
-		tm, err := time.Parse(zerolog.TimeFieldFormat, m["time"].(string))
-		if err != nil {
-			return fmt.Errorf("failed to parse time for fluend: %v", err)
+		tsNum, ok := m["time"].(json.Number)
+		if !ok {
+			return fmt.Errorf("unexpected time type for fluentd: %T", m["time"])
 		}
+		ns, err := tsNum.Int64()
+		if err != nil {
+			return fmt.Errorf("failed to parse time for fluentd: %v", err)
+		}
+		tm := time.Unix(0, ns).UTC()
+		formatted := tm.Format(timestampFormat)
+
 		m["level"] = strings.ToUpper(m["level"].(string))
-		m["timestamp"] = m["time"].(string)
+		m["time"] = formatted
+		m["timestamp"] = formatted
 		if nodeID != "" {
 			m["instance"] = nodeID
 		}

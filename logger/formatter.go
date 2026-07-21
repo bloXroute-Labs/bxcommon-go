@@ -1,8 +1,10 @@
 package logger
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 )
@@ -11,6 +13,12 @@ const timestampFormat = "2006-01-02T15:04:05.000000"
 
 func formatTimestamp() zerolog.Formatter {
 	return func(i interface{}) string {
+		if num, ok := i.(json.Number); ok {
+			ns, err := num.Int64()
+			if err == nil {
+				return fmt.Sprintf("time=\"%s\"", time.Unix(0, ns).UTC().Format(timestampFormat))
+			}
+		}
 		return fmt.Sprintf("time=\"%s\"", i)
 	}
 }

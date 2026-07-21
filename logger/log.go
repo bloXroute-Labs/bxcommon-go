@@ -75,7 +75,7 @@ func Init(logConfig *Config, fluentDConfig *FluentDConfig, version string) (clos
 	initConfigMutex.Lock()
 	defer initConfigMutex.Unlock()
 
-	zerolog.TimeFieldFormat = timestampFormat
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixNano
 	log.Logger = zerolog.New(zerolog.MultiLevelWriter(writers...)).Level(logLevel).With().Timestamp().Logger()
 
 	log.Debug().Msg("log initiated")
