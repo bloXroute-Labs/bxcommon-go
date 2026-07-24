@@ -72,6 +72,7 @@ type SDNHTTP interface {
 	FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	RotateCertificate(ctx context.Context) error
 	GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error)
+	UpdateAccountGrade(ctx context.Context, accountID types.AccountID, grade int) error
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -974,4 +975,14 @@ func (s *realSDNHTTP) GetSubmissionStatus(ctx context.Context, accountID types.A
 		return nil, fmt.Errorf("could not deserialize '%s' response into potential relays: %v", string(resp), err)
 	}
 	return &submissionStatus, nil
+}
+
+// UpdateAccountGrade updates the grade of the given account
+func (s *realSDNHTTP) UpdateAccountGrade(ctx context.Context, accountID types.AccountID, grade int) error {
+	url := fmt.Sprintf("%v/accounts/%v/grade/%v", s.sdnURL, accountID, grade)
+	_, err := s.httpWithContext(ctx, url, http.MethodPatch, nil)
+	if err != nil {
+		return err
+	}
+	return nil
 }

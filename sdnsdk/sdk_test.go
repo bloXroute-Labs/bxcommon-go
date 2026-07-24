@@ -1334,6 +1334,48 @@ func TestRotateCertificate_NoopWhenNotWithinRenewalWindow(t *testing.T) {
 	require.Contains(t, string(got), "BEGIN CERTIFICATE")
 }
 
+func TestUpdateAccountGrade(t *testing.T) {
+	accountID := types.AccountID("test-account")
+	grade := 3
+
+	var gotMethod, gotPath string
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	}
+	pattern := "/accounts/{accountID}/grade/{grade}"
+	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	err := s.UpdateAccountGrade(context.Background(), accountID, grade)
+	require.NoError(t, err)
+	assert.Equal(t, http.MethodPatch, gotMethod)
+	assert.Equal(t, fmt.Sprintf("/accounts/%v/grade/%v", accountID, grade), gotPath)
+}
+
+func TestUpdateAccountGrade_ServerError(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	pattern := "/accounts/{accountID}/grade/{grade}"
+	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	err := s.UpdateAccountGrade(context.Background(), types.AccountID("test-account"), 1)
+	require.Error(t, err)
+}
+
 func TestGetPingLatencies(t *testing.T) {
 	l1, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "failed to start listener on l1")
