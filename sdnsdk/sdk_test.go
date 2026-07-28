@@ -1376,6 +1376,71 @@ func TestUpdateAccountGrade_ServerError(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestUpdateAccountGradesBulk(t *testing.T) {
+	grades := map[types.AccountID]int{
+		types.AccountID("account-1"): 1,
+		types.AccountID("account-2"): 0,
+	}
+
+	var gotMethod, gotPath string
+	var gotBody []byte
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"total":2,"succeeded":2,"failed":0,"errors":{}}`))
+	}
+	pattern := "/accounts/grade/bulk"
+	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	result, err := s.UpdateAccountGradesBulk(context.Background(), grades)
+	require.NoError(t, err)
+	assert.Equal(t, http.MethodPatch, gotMethod)
+	assert.Equal(t, pattern, gotPath)
+
+	var sentEntries []map[types.AccountID]int
+	require.NoError(t, json.Unmarshal(gotBody, &sentEntries))
+	sentGrades := make(map[types.AccountID]int, len(sentEntries))
+	for _, entry := range sentEntries {
+		require.Len(t, entry, 1)
+		for accountID, grade := range entry {
+			sentGrades[accountID] = grade
+		}
+	}
+	assert.Equal(t, grades, sentGrades)
+
+	require.NotNil(t, result)
+	assert.Equal(t, 2, result.Total)
+	assert.Equal(t, 2, result.Succeeded)
+	assert.Equal(t, 0, result.Failed)
+	assert.Empty(t, result.Errors)
+}
+
+func TestUpdateAccountGradesBulk_ServerError(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	pattern := "/accounts/grade/bulk"
+	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	result, err := s.UpdateAccountGradesBulk(context.Background(), map[types.AccountID]int{types.AccountID("test-account"): 1})
+	require.Error(t, err)
+	assert.Nil(t, result)
+}
+
 func TestGetPingLatencies(t *testing.T) {
 	l1, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "failed to start listener on l1")

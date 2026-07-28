@@ -73,6 +73,7 @@ type SDNHTTP interface {
 	RotateCertificate(ctx context.Context) error
 	GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error)
 	UpdateAccountGrade(ctx context.Context, accountID types.AccountID, grade int) error
+	UpdateAccountGradesBulk(ctx context.Context, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error)
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -145,6 +146,14 @@ type QuotaResponseBody struct {
 
 type SubmissionStatus struct {
 	SubmissionStatus bool `json:"submission_status"`
+}
+
+// UpdateAccountGradesBulkResponse is the response body for a bulk account grade update
+type UpdateAccountGradesBulkResponse struct {
+	Total     int                        `json:"total"`
+	Succeeded int                        `json:"succeeded"`
+	Failed    int                        `json:"failed"`
+	Errors    map[types.AccountID]string `json:"errors"`
 }
 
 type relayToSwitch struct {
@@ -985,4 +994,33 @@ func (s *realSDNHTTP) UpdateAccountGrade(ctx context.Context, accountID types.Ac
 		return err
 	}
 	return nil
+}
+
+// UpdateAccountGradesBulk updates the grade of many accounts at once via the
+// SDN's bulk grade endpoint, which writes to Redis only (no relay/cloud-api
+// broadcast). Prefer this over calling UpdateAccountGrade in a loop for large
+// batches - each call there is a full HTTP/mTLS round trip against the SDN,
+// and doing that for thousands of accounts drives its CPU very high.
+func (s *realSDNHTTP) UpdateAccountGradesBulk(ctx context.Context, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error) {
+	payload := make([]map[types.AccountID]int, 0, len(grades))
+	for accountID, grade := range grades {
+		payload = append(payload, map[types.AccountID]int{accountID: grade})
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize request body: %w", err)
+	}
+
+	url := fmt.Sprintf("%v/accounts/grade/bulk", s.sdnURL)
+	resp, err := s.httpWithContext(ctx, url, http.MethodPatch, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var result UpdateAccountGradesBulkResponse
+	if err = json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("could not deserialize '%s' response into bulk grade update result: %w", string(resp), err)
+	}
+	return &result, nil
 }
