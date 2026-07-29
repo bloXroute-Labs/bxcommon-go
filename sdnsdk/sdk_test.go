@@ -1336,6 +1336,7 @@ func TestRotateCertificate_NoopWhenNotWithinRenewalWindow(t *testing.T) {
 
 func TestUpdateAccountGrade(t *testing.T) {
 	accountID := types.AccountID("test-account")
+	network := GradeNetworkBSC
 	grade := 3
 
 	var gotMethod, gotPath string
@@ -1344,7 +1345,7 @@ func TestUpdateAccountGrade(t *testing.T) {
 		gotPath = r.URL.Path
 		w.WriteHeader(http.StatusOK)
 	}
-	pattern := "/accounts/{accountID}/grade/{grade}"
+	pattern := "/accounts/{accountID}/grade/{network}/{grade}"
 	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
 	defer server.Close()
 
@@ -1353,17 +1354,17 @@ func TestUpdateAccountGrade(t *testing.T) {
 		sdnURL:   server.URL,
 	}
 
-	err := s.UpdateAccountGrade(context.Background(), accountID, grade)
+	err := s.UpdateAccountGrade(context.Background(), accountID, network, grade)
 	require.NoError(t, err)
 	assert.Equal(t, http.MethodPatch, gotMethod)
-	assert.Equal(t, fmt.Sprintf("/accounts/%v/grade/%v", accountID, grade), gotPath)
+	assert.Equal(t, fmt.Sprintf("/accounts/%v/grade/%v/%v", accountID, network, grade), gotPath)
 }
 
 func TestUpdateAccountGrade_ServerError(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	pattern := "/accounts/{accountID}/grade/{grade}"
+	pattern := "/accounts/{accountID}/grade/{network}/{grade}"
 	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
 	defer server.Close()
 
@@ -1372,11 +1373,12 @@ func TestUpdateAccountGrade_ServerError(t *testing.T) {
 		sdnURL:   server.URL,
 	}
 
-	err := s.UpdateAccountGrade(context.Background(), types.AccountID("test-account"), 1)
+	err := s.UpdateAccountGrade(context.Background(), types.AccountID("test-account"), GradeNetworkBSC, 1)
 	require.Error(t, err)
 }
 
 func TestUpdateAccountGradesBulk(t *testing.T) {
+	network := GradeNetworkETH
 	grades := map[types.AccountID]int{
 		types.AccountID("account-1"): 1,
 		types.AccountID("account-2"): 0,
@@ -1391,7 +1393,7 @@ func TestUpdateAccountGradesBulk(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"total":2,"succeeded":2,"failed":0,"errors":{}}`))
 	}
-	pattern := "/accounts/grade/bulk"
+	pattern := "/accounts/grade/bulk/{network}"
 	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
 	defer server.Close()
 
@@ -1400,10 +1402,10 @@ func TestUpdateAccountGradesBulk(t *testing.T) {
 		sdnURL:   server.URL,
 	}
 
-	result, err := s.UpdateAccountGradesBulk(context.Background(), grades)
+	result, err := s.UpdateAccountGradesBulk(context.Background(), network, grades)
 	require.NoError(t, err)
 	assert.Equal(t, http.MethodPatch, gotMethod)
-	assert.Equal(t, pattern, gotPath)
+	assert.Equal(t, fmt.Sprintf("/accounts/grade/bulk/%v", network), gotPath)
 
 	var sentEntries []map[types.AccountID]int
 	require.NoError(t, json.Unmarshal(gotBody, &sentEntries))
@@ -1427,7 +1429,7 @@ func TestUpdateAccountGradesBulk_ServerError(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	pattern := "/accounts/grade/bulk"
+	pattern := "/accounts/grade/bulk/{network}"
 	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: pattern, handler: handler}})
 	defer server.Close()
 
@@ -1436,7 +1438,9 @@ func TestUpdateAccountGradesBulk_ServerError(t *testing.T) {
 		sdnURL:   server.URL,
 	}
 
-	result, err := s.UpdateAccountGradesBulk(context.Background(), map[types.AccountID]int{types.AccountID("test-account"): 1})
+	result, err := s.UpdateAccountGradesBulk(
+		context.Background(), GradeNetworkBSC, map[types.AccountID]int{types.AccountID("test-account"): 1},
+	)
 	require.Error(t, err)
 	assert.Nil(t, result)
 }
