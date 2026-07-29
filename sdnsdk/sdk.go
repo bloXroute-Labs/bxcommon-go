@@ -42,8 +42,12 @@ const (
 	potentialRelaysFileName         = "potentialrelays.json"
 	accountModelsFileName           = "accountmodel.json"
 	httpTimeout                     = 10 * time.Second
-	latencyThreshold                = 10
-	privateCertRenewalPeriodDays    = 180
+	// bulkGradeHTTPTimeout is longer than the default httpTimeout because a
+	// large batch (thousands of accounts) legitimately takes the SDN more
+	// than 10s to process, throttled as it is to protect its Redis pool.
+	bulkGradeHTTPTimeout         = 2 * time.Minute
+	latencyThreshold             = 10
+	privateCertRenewalPeriodDays = 180
 )
 
 // SDNHTTP is the interface for realSDNHTTP type
@@ -72,8 +76,8 @@ type SDNHTTP interface {
 	FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	RotateCertificate(ctx context.Context) error
 	GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error)
-	UpdateAccountGrade(ctx context.Context, accountID types.AccountID, grade int) error
-	UpdateAccountGradesBulk(ctx context.Context, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error)
+	UpdateAccountGrade(ctx context.Context, accountID types.AccountID, network string, grade int) error
+	UpdateAccountGradesBulk(ctx context.Context, network string, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error)
 }
 
 // realSDNHTTP is a connection to the bloxroute API
@@ -155,6 +159,15 @@ type UpdateAccountGradesBulkResponse struct {
 	Failed    int                        `json:"failed"`
 	Errors    map[types.AccountID]string `json:"errors"`
 }
+
+// Grade networks - each network's grade is decided on independently, so
+// grade updates must specify which one they're targeting. Distinct from the
+// longer BSCMainnet/Mainnet-style network identifiers used elsewhere (those
+// describe peer/network connections, not this grade split).
+const (
+	GradeNetworkBSC = "bsc"
+	GradeNetworkETH = "eth"
+)
 
 type relayToSwitch struct {
 	ip   string
@@ -592,6 +605,10 @@ func (s *realSDNHTTP) NetworkNum() types.NetworkNum {
 }
 
 func (s *realSDNHTTP) httpClient() (*http.Client, error) {
+	return s.httpClientWithTimeout(httpTimeout)
+}
+
+func (s *realSDNHTTP) httpClientWithTimeout(timeout time.Duration) (*http.Client, error) {
 	var tlsConfig *tls.Config
 	var err error
 	if s.sslCerts.NeedsPrivateCert() {
@@ -607,7 +624,7 @@ func (s *realSDNHTTP) httpClient() (*http.Client, error) {
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 		},
-		Timeout: httpTimeout,
+		Timeout: timeout,
 	}
 
 	return client, nil
@@ -804,7 +821,11 @@ func (s *realSDNHTTP) http(uri string, method string, body io.Reader) ([]byte, e
 }
 
 func (s *realSDNHTTP) httpWithContext(ctx context.Context, uri string, method string, body io.Reader) ([]byte, error) {
-	client, err := s.httpClient()
+	return s.httpWithContextAndTimeout(ctx, uri, method, body, httpTimeout)
+}
+
+func (s *realSDNHTTP) httpWithContextAndTimeout(ctx context.Context, uri string, method string, body io.Reader, timeout time.Duration) ([]byte, error) {
+	client, err := s.httpClientWithTimeout(timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -986,9 +1007,11 @@ func (s *realSDNHTTP) GetSubmissionStatus(ctx context.Context, accountID types.A
 	return &submissionStatus, nil
 }
 
-// UpdateAccountGrade updates the grade of the given account
-func (s *realSDNHTTP) UpdateAccountGrade(ctx context.Context, accountID types.AccountID, grade int) error {
-	url := fmt.Sprintf("%v/accounts/%v/grade/%v", s.sdnURL, accountID, grade)
+// UpdateAccountGrade updates the grade of the given account for the given
+// network (GradeNetworkBSC or GradeNetworkETH) - each network's grade is
+// independent, updating one never touches the other
+func (s *realSDNHTTP) UpdateAccountGrade(ctx context.Context, accountID types.AccountID, network string, grade int) error {
+	url := fmt.Sprintf("%v/accounts/%v/grade/%v/%v", s.sdnURL, accountID, network, grade)
 	_, err := s.httpWithContext(ctx, url, http.MethodPatch, nil)
 	if err != nil {
 		return err
@@ -996,12 +1019,13 @@ func (s *realSDNHTTP) UpdateAccountGrade(ctx context.Context, accountID types.Ac
 	return nil
 }
 
-// UpdateAccountGradesBulk updates the grade of many accounts at once via the
-// SDN's bulk grade endpoint, which writes to Redis only (no relay/cloud-api
-// broadcast). Prefer this over calling UpdateAccountGrade in a loop for large
-// batches - each call there is a full HTTP/mTLS round trip against the SDN,
-// and doing that for thousands of accounts drives its CPU very high.
-func (s *realSDNHTTP) UpdateAccountGradesBulk(ctx context.Context, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error) {
+// UpdateAccountGradesBulk updates the grade of many accounts at once, for the
+// given network (GradeNetworkBSC or GradeNetworkETH), via the SDN's bulk
+// grade endpoint, which writes to Redis only (no relay/cloud-api broadcast).
+// Prefer this over calling UpdateAccountGrade in a loop for large batches -
+// each call there is a full HTTP/mTLS round trip against the SDN, and doing
+// that for thousands of accounts drives its CPU very high.
+func (s *realSDNHTTP) UpdateAccountGradesBulk(ctx context.Context, network string, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error) {
 	payload := make([]map[types.AccountID]int, 0, len(grades))
 	for accountID, grade := range grades {
 		payload = append(payload, map[types.AccountID]int{accountID: grade})
@@ -1012,8 +1036,8 @@ func (s *realSDNHTTP) UpdateAccountGradesBulk(ctx context.Context, grades map[ty
 		return nil, fmt.Errorf("could not serialize request body: %w", err)
 	}
 
-	url := fmt.Sprintf("%v/accounts/grade/bulk", s.sdnURL)
-	resp, err := s.httpWithContext(ctx, url, http.MethodPatch, bytes.NewBuffer(body))
+	url := fmt.Sprintf("%v/accounts/grade/bulk/%v", s.sdnURL, network)
+	resp, err := s.httpWithContextAndTimeout(ctx, url, http.MethodPatch, bytes.NewBuffer(body), bulkGradeHTTPTimeout)
 	if err != nil {
 		return nil, err
 	}
