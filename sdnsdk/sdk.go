@@ -75,7 +75,7 @@ type SDNHTTP interface {
 	FindNewRelay(ctx context.Context, oldRelayIP string, oldRelayIPPort int64, relayInstructions chan RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	RotateCertificate(ctx context.Context) error
-	GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error)
+	GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum, whitelisted bool) (*SubmissionStatus, error)
 	UpdateAccountGrade(ctx context.Context, accountID types.AccountID, network string, grade int) error
 	UpdateAccountGradesBulk(ctx context.Context, network string, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error)
 }
@@ -993,8 +993,14 @@ var networkNumToSubmissionStatusEndpoint = map[types.NetworkNum]string{
 	types.PolygonMainnetNum: "polygon",
 }
 
-func (s *realSDNHTTP) GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum) (*SubmissionStatus, error) {
-	url := fmt.Sprintf("%v/accounts/%v/submission-status/%v", s.sdnURL, accountID, networkNumToSubmissionStatusEndpoint[networkNum])
+// GetSubmissionStatus asks the SDN whether the account may submit optimistically
+// on the given network. whitelisted tells the SDN whether the caller has the
+// account in its optimistic submission whitelist - accounts that aren't
+// whitelisted are never allowed to submit optimistically, whatever their other
+// state (e.g. tipping) says.
+func (s *realSDNHTTP) GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum, whitelisted bool) (*SubmissionStatus, error) {
+	url := fmt.Sprintf("%v/accounts/%v/submission-status/%v?whitelisted=%v",
+		s.sdnURL, accountID, networkNumToSubmissionStatusEndpoint[networkNum], whitelisted)
 	resp, err := s.httpWithContext(ctx, url, http.MethodGet, nil)
 	if err != nil {
 		return nil, err
