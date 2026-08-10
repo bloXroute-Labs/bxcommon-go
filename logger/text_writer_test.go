@@ -44,6 +44,9 @@ func TestTextWriterAllocations(t *testing.T) {
 	require.Zero(t, allocs)
 }
 
+// Apple M1 Pro, Go 1.26.1:
+// ConsoleWriter: ~4.3 us/op, 2362 B/op, 78 allocs/op.
+// TextWriter:     ~0.5 us/op,    0 B/op,  0 allocs/op.
 func BenchmarkTextWriter(b *testing.B) {
 	event := []byte(`{"level":"info","time":1786377600123456789,"message":"transaction submitted","accountID":"12345","blockHash":"abc","signature":"xyz","slot":123456,"validator":"validator-key"}`)
 
