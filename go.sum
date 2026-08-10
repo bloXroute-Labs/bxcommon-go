@@ -1,3 +1,5 @@
+github.com/bloXroute-Labs/fluent-logger-golang v0.0.0-20260810204048-6b2676bfaf1e h1:6wTPGaiy3V2nu2dv19m0OyDyjx+PQrYaUaQx92i3lQE=
+github.com/bloXroute-Labs/fluent-logger-golang v0.0.0-20260810204048-6b2676bfaf1e/go.mod h1:oEFo0hiZw3JB1H8untX+AuvO9wae5bTbhLcM8L6H3Qs=
 github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
 github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

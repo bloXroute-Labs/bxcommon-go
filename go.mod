@@ -3,7 +3,8 @@ module github.com/bloXroute-Labs/bxcommon-go
 go 1.26.1
 
 require (
-	github.com/fluent/fluent-logger-golang v1.10.1
+	github.com/bloXroute-Labs/fluent-logger-golang v0.0.0-20260810204048-6b2676bfaf1e
+	github.com/buger/jsonparser v1.1.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/puzpuzpuz/xsync/v2 v2.5.1
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
