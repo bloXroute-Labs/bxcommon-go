@@ -33,6 +33,17 @@ func TestTextWriterMatchesConsoleWriter(t *testing.T) {
 	}
 }
 
+func TestTextWriterAllocations(t *testing.T) {
+	event := []byte(`{"level":"info","time":1786377600123456789,"message":"transaction submitted","accountID":"12345","blockHash":"abc","signature":"xyz","slot":123456,"validator":"validator-key"}`)
+	writer := newTextWriter(io.Discard)
+
+	allocs := testing.AllocsPerRun(1000, func() {
+		_, _ = writer.Write(event)
+	})
+
+	require.Zero(t, allocs)
+}
+
 func BenchmarkTextWriter(b *testing.B) {
 	event := []byte(`{"level":"info","time":1786377600123456789,"message":"transaction submitted","accountID":"12345","blockHash":"abc","signature":"xyz","slot":123456,"validator":"validator-key"}`)
 
