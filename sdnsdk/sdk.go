@@ -45,9 +45,13 @@ const (
 	// bulkGradeHTTPTimeout is longer than the default httpTimeout because a
 	// large batch (thousands of accounts) legitimately takes the SDN more
 	// than 10s to process, throttled as it is to protect its Redis pool.
-	bulkGradeHTTPTimeout         = 2 * time.Minute
-	latencyThreshold             = 10
-	privateCertRenewalPeriodDays = 180
+	bulkGradeHTTPTimeout = 2 * time.Minute
+	// bulkSubmissionStatusHTTPTimeout is longer than the default httpTimeout
+	// because one bulk call stands in for a whole refresh pass - the SDN
+	// answers every account of the batch in a single request.
+	bulkSubmissionStatusHTTPTimeout = 30 * time.Second
+	latencyThreshold                = 10
+	privateCertRenewalPeriodDays    = 180
 )
 
 // SDNHTTP is the interface for realSDNHTTP type
@@ -76,6 +80,7 @@ type SDNHTTP interface {
 	FindFastestRelays(relayInstructions chan<- RelayInstruction, ignoredRelays IgnoredRelaysMap)
 	RotateCertificate(ctx context.Context) error
 	GetSubmissionStatus(ctx context.Context, accountID types.AccountID, networkNum types.NetworkNum, whitelisted bool) (*SubmissionStatus, error)
+	GetSubmissionStatusBulk(ctx context.Context, networkNum types.NetworkNum, requests []SubmissionStatusRequest) (*SubmissionStatusBulkResponse, error)
 	UpdateAccountGrade(ctx context.Context, accountID types.AccountID, network string, grade int) error
 	UpdateAccountGradesBulk(ctx context.Context, network string, grades map[types.AccountID]int) (*UpdateAccountGradesBulkResponse, error)
 }
@@ -150,6 +155,31 @@ type QuotaResponseBody struct {
 
 type SubmissionStatus struct {
 	SubmissionStatus bool `json:"submission_status"`
+}
+
+// SubmissionStatusRequest is one entry of the bulk submission-status request
+// body: the account to look up, plus the caller's whitelisted flag for it.
+type SubmissionStatusRequest struct {
+	AccountID   types.AccountID `json:"account_id"`
+	Whitelisted bool            `json:"whitelisted"`
+}
+
+// AccountSubmissionStatus is the SDN's answer for one account of a bulk
+// submission-status request.
+type AccountSubmissionStatus struct {
+	AccountID        types.AccountID `json:"account_id"`
+	SubmissionStatus bool            `json:"submission_status"`
+}
+
+// SubmissionStatusBulkResponse is the response body of the bulk
+// submission-status endpoint. Accounts the SDN could not answer for are
+// counted in Failed and are absent from Results - a caller keeps whatever it
+// already had for them rather than defaulting.
+type SubmissionStatusBulkResponse struct {
+	Total     int                       `json:"total"`
+	Succeeded int                       `json:"succeeded"`
+	Failed    int                       `json:"failed"`
+	Results   []AccountSubmissionStatus `json:"results"`
 }
 
 // UpdateAccountGradesBulkResponse is the response body for a bulk account grade update
@@ -1011,6 +1041,43 @@ func (s *realSDNHTTP) GetSubmissionStatus(ctx context.Context, accountID types.A
 		return nil, fmt.Errorf("could not deserialize '%s' response into potential relays: %v", string(resp), err)
 	}
 	return &submissionStatus, nil
+}
+
+// GetSubmissionStatusBulk asks the SDN for the optimistic submission status of
+// many accounts at once - one entry per account, carrying that account's
+// whitelisted flag (see GetSubmissionStatus for what the flag means). Prefer
+// this over calling GetSubmissionStatus in a loop: each call there is a full
+// HTTP/mTLS round trip against the SDN.
+//
+// The endpoint is a GET carrying a JSON body, which is how the SDN defines it.
+// Accounts the SDN could not answer for are counted in Failed and left out of
+// Results, so a caller keeps its previous value for them instead of defaulting.
+func (s *realSDNHTTP) GetSubmissionStatusBulk(ctx context.Context, networkNum types.NetworkNum, requests []SubmissionStatusRequest) (*SubmissionStatusBulkResponse, error) {
+	endpoint, ok := networkNumToSubmissionStatusEndpoint[networkNum]
+	if !ok {
+		return nil, fmt.Errorf("submission status is not supported on network %v", networkNum)
+	}
+
+	if len(requests) == 0 {
+		return &SubmissionStatusBulkResponse{}, nil
+	}
+
+	body, err := json.Marshal(requests)
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize request body: %w", err)
+	}
+
+	url := fmt.Sprintf("%v/accounts/submission-status/%v/bulk", s.sdnURL, endpoint)
+	resp, err := s.httpWithContextAndTimeout(ctx, url, http.MethodGet, bytes.NewBuffer(body), bulkSubmissionStatusHTTPTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	var result SubmissionStatusBulkResponse
+	if err = json.Unmarshal(resp, &result); err != nil {
+		return nil, fmt.Errorf("could not deserialize '%s' response into bulk submission status result: %w", string(resp), err)
+	}
+	return &result, nil
 }
 
 // UpdateAccountGrade updates the grade of the given account for the given

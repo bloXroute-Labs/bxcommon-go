@@ -1445,6 +1445,136 @@ func TestUpdateAccountGradesBulk_ServerError(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestGetSubmissionStatusBulk(t *testing.T) {
+	requests := []SubmissionStatusRequest{
+		{AccountID: types.AccountID("account-1"), Whitelisted: true},
+		{AccountID: types.AccountID("account-2"), Whitelisted: false},
+	}
+
+	var gotMethod, gotPath string
+	var gotBody []byte
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"total":2,"succeeded":2,"failed":0,"results":[` +
+			`{"account_id":"account-1","submission_status":true},` +
+			`{"account_id":"account-2","submission_status":false}]}`))
+	}
+	pattern := "/accounts/submission-status/{network}/bulk"
+	server := mockRouter([]handlerArgs{{method: http.MethodGet, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	result, err := s.GetSubmissionStatusBulk(context.Background(), types.PolygonMainnetNum, requests)
+	require.NoError(t, err)
+	assert.Equal(t, http.MethodGet, gotMethod)
+	assert.Equal(t, "/accounts/submission-status/polygon/bulk", gotPath)
+
+	var sentRequests []SubmissionStatusRequest
+	require.NoError(t, json.Unmarshal(gotBody, &sentRequests))
+	assert.Equal(t, requests, sentRequests)
+
+	require.NotNil(t, result)
+	assert.Equal(t, 2, result.Total)
+	assert.Equal(t, 2, result.Succeeded)
+	assert.Equal(t, 0, result.Failed)
+	assert.Equal(t, []AccountSubmissionStatus{
+		{AccountID: types.AccountID("account-1"), SubmissionStatus: true},
+		{AccountID: types.AccountID("account-2"), SubmissionStatus: false},
+	}, result.Results)
+}
+
+// TestGetSubmissionStatusBulk_PartialFailure pins that accounts the SDN could not answer for are
+// simply missing from the results - they are not reported as denied.
+func TestGetSubmissionStatusBulk_PartialFailure(t *testing.T) {
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"total":2,"succeeded":1,"failed":1,"results":[` +
+			`{"account_id":"account-1","submission_status":true}]}`))
+	}
+	pattern := "/accounts/submission-status/{network}/bulk"
+	server := mockRouter([]handlerArgs{{method: http.MethodGet, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	result, err := s.GetSubmissionStatusBulk(context.Background(), types.PolygonMainnetNum, []SubmissionStatusRequest{
+		{AccountID: types.AccountID("account-1")},
+		{AccountID: types.AccountID("account-2")},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 1, result.Failed)
+	require.Len(t, result.Results, 1)
+	assert.Equal(t, types.AccountID("account-1"), result.Results[0].AccountID)
+}
+
+func TestGetSubmissionStatusBulk_NoRequestsDoesNotCallSDN(t *testing.T) {
+	var called bool
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}
+	pattern := "/accounts/submission-status/{network}/bulk"
+	server := mockRouter([]handlerArgs{{method: http.MethodGet, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	result, err := s.GetSubmissionStatusBulk(context.Background(), types.PolygonMainnetNum, nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Empty(t, result.Results)
+	assert.False(t, called)
+}
+
+// TestGetSubmissionStatusBulk_UnsupportedNetwork pins that a network without a submission-status
+// endpoint errors out instead of hitting a malformed URL.
+func TestGetSubmissionStatusBulk_UnsupportedNetwork(t *testing.T) {
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   "http://127.0.0.1:0",
+	}
+
+	result, err := s.GetSubmissionStatusBulk(context.Background(), types.BSCMainnetNum, []SubmissionStatusRequest{
+		{AccountID: types.AccountID("account-1")},
+	})
+	require.Error(t, err)
+	assert.Nil(t, result)
+}
+
+func TestGetSubmissionStatusBulk_ServerError(t *testing.T) {
+	handler := func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	pattern := "/accounts/submission-status/{network}/bulk"
+	server := mockRouter([]handlerArgs{{method: http.MethodGet, pattern: pattern, handler: handler}})
+	defer server.Close()
+
+	s := &realSDNHTTP{
+		sslCerts: SetupTestCerts(),
+		sdnURL:   server.URL,
+	}
+
+	result, err := s.GetSubmissionStatusBulk(context.Background(), types.PolygonMainnetNum, []SubmissionStatusRequest{
+		{AccountID: types.AccountID("account-1")},
+	})
+	require.Error(t, err)
+	assert.Nil(t, result)
+}
+
 func TestGetPingLatencies(t *testing.T) {
 	l1, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "failed to start listener on l1")
