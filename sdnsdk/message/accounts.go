@@ -394,10 +394,28 @@ type AccountInfo struct {
 	ETHGrade           int             `json:"eth_grade"`
 }
 
+// DefaultAccountGrade is the per-chain grade carried by GetDefaultEliteAccount.
+//
+// It is deliberately NOT 0. Consumers tier accounts by grade (cloud-api's grade_tiers), and
+// 0 is the grade an ungraded account carries, so a fallback account left at the zero value
+// would be indistinguishable from an ungraded one - meaning that whatever policy is attached
+// to grade 0 would apply to every account the moment the SDN stops answering. Grading the
+// fallback explicitly keeps the outage case out of that tier (DI-4161).
+//
+// The value is high on purpose, not arbitrary: it must land in the tier that applies no
+// restriction, since during an outage it stands in for EVERY account, including the ones
+// whose real grade is the highest. Under cloud-api's shipped thresholds 100 resolves to the
+// top tier - no routing override, no tier rate limit. Lowering it would silently subject all
+// traffic to a restricted tier's policy for the length of an SDN outage.
+const DefaultAccountGrade = 100
+
 // IsTrusted indicates whether the account is trusted
 func (a *Account) IsTrusted() bool { return !a.Untrusted || a.Miner }
 
-// GetDefaultEliteAccount get a default elite account by current time
+// GetDefaultEliteAccount get a default elite account by current time.
+//
+// Both per-chain grades are set to DefaultAccountGrade rather than left at the zero value -
+// see that constant for why an SDN-outage fallback must not look ungraded.
 func GetDefaultEliteAccount(now time.Time) Account {
 	return Account{
 		AccountInfo: AccountInfo{
@@ -409,6 +427,8 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			BlockchainNetwork:  "Mainnet",
 			TierName:           ATierElite,
 			Miner:              false,
+			BSCGrade:           DefaultAccountGrade,
+			ETHGrade:           DefaultAccountGrade,
 		},
 		FreeTransactions: BDNQuotaService{
 			MsgQuota: BDNService{
