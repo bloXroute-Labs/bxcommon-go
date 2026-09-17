@@ -47,18 +47,70 @@ func TestISODateUnmarshal(t *testing.T) {
 	}
 }
 
-func TestISODateUnmarshalRejectsMalformed(t *testing.T) {
+// TestISODateUnmarshalFallsBackOnMalformed pins bxapi's own handling: its model loader keeps
+// expire_date as a string and only parses it when asked whether the service is valid, where
+// an unreadable date returns False. So a bad date has to invalidate its own service, not fail
+// the account it arrived in.
+func TestISODateUnmarshalFallsBackOnMalformed(t *testing.T) {
 	for _, in := range []string{
 		`{"expire_date":"2026-13-45"}`,
 		`{"expire_date":"23/03/2076"}`,
-		// RFC 3339 is deliberately not accepted: bxapi sends calendar dates, and
-		// silently widening the format would hide a contract change.
+		// RFC 3339 is not accepted either: bxapi writes expire_date with date.isoformat(),
+		// so a timestamp would mean the contract changed, not that this service is current.
 		`{"expire_date":"2026-01-02T00:00:00Z"}`,
 		`{"expire_date":12345}`,
+		`{"expire_date":{"nested":true}}`,
 	} {
 		var h dateHolder
-		assert.Error(t, json.Unmarshal([]byte(in), &h), in)
+		require.NoError(t, json.Unmarshal([]byte(in), &h), in)
+		assert.True(t, h.ExpireDate.Equal(ExpiredISODate.Time), in)
+		assert.True(t, h.ExpireDate.Expired(), in)
 	}
+}
+
+// TestParseISODateIsStrict: the explicit parse path still reports a bad date, so callers that
+// want to validate rather than degrade have a way to.
+func TestParseISODateIsStrict(t *testing.T) {
+	_, err := ParseISODate("2026-13-45")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidDate)
+
+	var d ISODate
+	assert.ErrorIs(t, d.UnmarshalText([]byte("nonsense")), ErrInvalidDate)
+}
+
+// TestISODateExpired pins the comparison against bxapi's is_service_valid, which is
+// `expire_date >= datetime.utcnow().date()`: calendar dates in UTC, expiry day inclusive.
+func TestISODateExpired(t *testing.T) {
+	kyiv, err := time.LoadLocation("Europe/Kiev")
+	require.NoError(t, err)
+
+	expire, err := ParseISODate("2026-09-17")
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name    string
+		now     time.Time
+		expired bool
+	}{
+		{name: "day before", now: time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)},
+		{name: "expiry day, start", now: time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)},
+		{name: "expiry day, end", now: time.Date(2026, 9, 17, 23, 59, 59, 0, time.UTC)},
+		// the case the old instant comparison got wrong: past 03:00 in Kyiv the wall clock
+		// is ahead of UTC midnight, and the service was retired most of a day early
+		{name: "expiry day, Kyiv morning", now: time.Date(2026, 9, 17, 4, 0, 0, 0, kyiv)},
+		{name: "expiry day, Kyiv evening", now: time.Date(2026, 9, 17, 23, 0, 0, 0, kyiv)},
+		{name: "day after", now: time.Date(2026, 9, 18, 0, 0, 0, 0, time.UTC), expired: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expired, expire.expiredAt(tc.now))
+		})
+	}
+
+	assert.True(t, ExpiredISODate.Expired())
+	assert.True(t, ISODate{}.Expired())
+	assert.False(t, NewISODate(time.Now().UTC()).Expired(), "a service expiring today is still valid")
+	assert.False(t, NewISODate(time.Now().Add(time.Hour)).Expired())
 }
 
 func TestISODateMarshal(t *testing.T) {
@@ -136,19 +188,20 @@ func TestNewISODateKeepsTimeOfDay(t *testing.T) {
 	soon := time.Now().Add(time.Hour)
 	date := NewISODate(soon)
 
-	assert.True(t, time.Now().Before(date.Time))
+	assert.False(t, date.Expired())
 	assert.Equal(t, soon.Format(TimeDateLayoutISO), date.Format(TimeDateLayoutISO))
 }
 
 // TestISODateAbsentKeyNormalizesOnce documents the one case that is not equal on the first
 // pass: a key missing from the payload never reaches UnmarshalJSON, so the field keeps Go's
 // zero time, which encodes as the sentinel and decodes back as the sentinel. Both values are
-// expired, and everything is stable from the second decode on. The previous codecs had the
-// same gap and additionally put "0001-01-01" on the wire.
+// expired - and bxapi has no zero-date state at all, its loader leaves an absent service as
+// None - so this is cosmetic, and everything is stable from the second decode on.
 func TestISODateAbsentKeyNormalizesOnce(t *testing.T) {
 	var first dateHolder
 	require.NoError(t, json.Unmarshal([]byte(`{}`), &first))
 	assert.True(t, first.ExpireDate.IsZero())
+	assert.True(t, first.ExpireDate.Expired())
 
 	encoded, err := json.Marshal(first)
 	require.NoError(t, err)

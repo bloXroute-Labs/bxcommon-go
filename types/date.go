@@ -2,9 +2,15 @@ package types
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
+
+const day = 24 * time.Hour
+
+// ErrInvalidDate is returned by ParseISODate and UnmarshalText for a malformed date.
+var ErrInvalidDate = errors.New("invalid ISO date")
 
 // ExpiredISODate is the date bxapi sends for a service that is not provisioned, and the
 // value a service reported as JSON null decodes to.
@@ -26,15 +32,21 @@ func NewISODate(t time.Time) ISODate {
 func ParseISODate(s string) (ISODate, error) {
 	t, err := time.Parse(TimeDateLayoutISO, s)
 	if err != nil {
-		return ISODate{}, fmt.Errorf("parse date %q as %q: %w", s, TimeDateLayoutISO, err)
+		return ISODate{}, fmt.Errorf("%w: parse %q as %q: %w", ErrInvalidDate, s, TimeDateLayoutISO, err)
 	}
 
 	return ISODate{Time: t}, nil
 }
 
-// UnmarshalJSON implements deserialization for ISODate. A null or empty value yields
-// ExpiredISODate; anything else must be a well-formed TimeDateLayoutISO date, and a
-// malformed one is reported rather than silently swallowed as the zero value.
+// Expired reports whether the date has passed, the way bxapi decides it: calendar dates in
+// UTC, with the expiry day itself still valid (expire_date >= today).
+func (d ISODate) Expired() bool {
+	return d.expiredAt(time.Now())
+}
+
+// UnmarshalJSON implements deserialization for ISODate. Null, an empty string and any value
+// that is not a usable date yield ExpiredISODate, because bxapi treats a date it cannot read
+// as an invalid service rather than an invalid account.
 func (d *ISODate) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {
 		*d = ExpiredISODate
@@ -43,17 +55,14 @@ func (d *ISODate) UnmarshalJSON(b []byte) error {
 
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
-		return fmt.Errorf("date must be a JSON string: %w", err)
-	}
-
-	if s == "" {
 		*d = ExpiredISODate
 		return nil
 	}
 
 	parsed, err := ParseISODate(s)
 	if err != nil {
-		return err
+		*d = ExpiredISODate
+		return nil
 	}
 
 	*d = parsed
@@ -83,7 +92,9 @@ func (d ISODate) MarshalText() ([]byte, error) {
 	return []byte(d.Format(TimeDateLayoutISO)), nil
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler, the counterpart to MarshalText.
+// UnmarshalText implements encoding.TextUnmarshaler, the counterpart to MarshalText. It
+// reports a malformed date, unlike UnmarshalJSON, since its caller is decoding a map key
+// and collapsing several unreadable keys onto one value would lose entries.
 func (d *ISODate) UnmarshalText(b []byte) error {
 	if len(b) == 0 {
 		*d = ExpiredISODate
@@ -98,4 +109,9 @@ func (d *ISODate) UnmarshalText(b []byte) error {
 	*d = parsed
 
 	return nil
+}
+
+// expiredAt is Expired with the clock injected, so the day boundary can be tested.
+func (d ISODate) expiredAt(now time.Time) bool {
+	return d.Truncate(day).Before(now.Truncate(day))
 }

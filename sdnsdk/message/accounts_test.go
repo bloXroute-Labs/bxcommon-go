@@ -126,12 +126,38 @@ func TestAccountExpireDateRoundTrip(t *testing.T) {
 	assert.Equal(t, string(encoded), string(reencoded))
 }
 
-// TestAccountRejectsMalformedExpireDate: a date the SDN should never send is surfaced as an
-// error, which sends the caller down the documented fallback path, rather than being swallowed
-// as the zero date the way the previous codecs did.
-func TestAccountRejectsMalformedExpireDate(t *testing.T) {
+// TestAccountMalformedExpireDateIsolated mirrors bxapi, where an unreadable expire_date makes
+// is_service_valid return False for that service and leaves the rest of the account loaded.
+// Failing the whole json.Unmarshal instead would drop the caller onto the default elite
+// account for every service because of one bad field.
+func TestAccountMalformedExpireDateIsolated(t *testing.T) {
 	var account Account
-	assert.Error(t, json.Unmarshal([]byte(`{"cloud_api":{"expire_date":"2026-13-45"}}`), &account))
+	require.NoError(t, json.Unmarshal([]byte(
+		`{"cloud_api":{"expire_date":"2026-13-45"},"eth_builder":{"expire_date":"2999-01-01"},`+
+			`"tx_paid":{"expire_date":"2999-01-01","msg_quota":{"limit":7}}}`), &account))
+
+	assert.False(t, account.CloudAPI.IsActive(), "the unreadable date invalidates its service")
+	assert.True(t, account.CloudAPI.ExpireDate.Equal(types.ExpiredISODate.Time))
+
+	assert.True(t, account.EthBuilder.IsActive(), "sibling services are unaffected")
+	assert.True(t, account.PaidTransactions.IsActive())
+	assert.Equal(t, BDNServiceLimit(7), account.PaidTransactions.MsgQuota.Limit,
+		"the rest of the failing service's siblings still decode")
+}
+
+// TestAccountExpiryDayIsInclusive pins the comparison against bxapi's is_service_valid,
+// which is expire_date >= utcnow().date(). Comparing instants against local wall time, as
+// this package used to, retired a service partway through the day it was still entitled to.
+func TestAccountExpiryDayIsInclusive(t *testing.T) {
+	today := time.Now().UTC().Format(types.TimeDateLayoutISO)
+	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format(types.TimeDateLayoutISO)
+
+	var account Account
+	require.NoError(t, json.Unmarshal([]byte(
+		`{"cloud_api":{"expire_date":"`+today+`"},"eth_builder":{"expire_date":"`+yesterday+`"}}`), &account))
+
+	assert.True(t, account.CloudAPI.IsActive(), "a service expiring today is valid all day")
+	assert.False(t, account.EthBuilder.IsActive())
 }
 
 // TestAccountTrusted covers the optional bool bxapi sends as "trusted". The field used to be

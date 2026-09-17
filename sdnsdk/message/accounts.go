@@ -138,7 +138,7 @@ type BDNMinAllowedNodesService struct {
 
 // IsActive indicates whether the BDNMinAllowedNodesService is not expired and limit is 0
 func (bdnmans BDNMinAllowedNodesService) IsActive() bool {
-	return time.Now().Before(bdnmans.ExpireDate.Time) && bdnmans.MsgQuota.Limit == 0
+	return !bdnmans.ExpireDate.Expired() && bdnmans.MsgQuota.Limit == 0
 }
 
 // BDNService represents a service model config
@@ -201,7 +201,7 @@ func (bdnQS *BDNQuotaService) UnmarshalJSON(b []byte) error {
 
 // IsActive indicates whether the BDNQuotaService is not expired and has quota left
 func (bdnQS BDNQuotaService) IsActive() bool {
-	return time.Now().Before(bdnQS.ExpireDate.Time) && bdnQS.MsgQuota.Limit > 0
+	return !bdnQS.ExpireDate.Expired() && bdnQS.MsgQuota.Limit > 0
 }
 
 // SubscriptionPlanType represents the available feed subscription plan types
@@ -252,7 +252,7 @@ func (bdnbs *BDNBasicService) UnmarshalJSON(b []byte) error {
 
 // IsActive indicates whether the BDNBasicService is not expired
 func (bdnbs BDNBasicService) IsActive() bool {
-	return time.Now().Before(bdnbs.ExpireDate.Time)
+	return !bdnbs.ExpireDate.Expired()
 }
 
 // BDNFeedService is a placeholder for service model configs
@@ -285,7 +285,7 @@ func (bdnFS *BDNFeedService) UnmarshalJSON(b []byte) error {
 
 // IsActive indicates whether the BDNFeedService is not expired
 func (bdnFS BDNFeedService) IsActive() bool {
-	return time.Now().Before(bdnFS.ExpireDate.Time)
+	return !bdnFS.ExpireDate.Expired()
 }
 
 // BDNPrivateRelayService is a placeholder for service model configs
