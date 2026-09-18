@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -128,6 +129,22 @@ func TestISODateExpired(t *testing.T) {
 	assert.False(t, NewISODate(time.Now().Add(time.Hour)).Expired())
 }
 
+func TestISODateString(t *testing.T) {
+	date, err := ParseISODate("2026-09-17")
+	require.NoError(t, err)
+
+	assert.Equal(t, "2026-09-17", date.String())
+	assert.Equal(t, "2026-09-17", fmt.Sprintf("%v", date))
+	assert.Equal(t, "2026-09-17", fmt.Sprintf("%s", date))
+	assert.Equal(t, "account is expired ExpireDate: 2026-09-17",
+		fmt.Sprintf("account is expired ExpireDate: %v", date))
+
+	assert.Equal(t, ExpiredDate, ExpiredISODate.String())
+
+	var zero ISODate
+	assert.Equal(t, "0001-01-01", zero.String(), "a date that was never set stays visible")
+}
+
 func TestISODateMarshal(t *testing.T) {
 	date, err := ParseISODate("2076-03-23")
 	require.NoError(t, err)
@@ -192,6 +209,8 @@ func TestISODateTextCodec(t *testing.T) {
 }
 
 func TestNewISODateKeepsTimeOfDay(t *testing.T) {
+	// Only the wire format is date-granular. A service expiring later today must still
+	// read as unexpired in memory, which is what the in-process defaults rely on.
 	soon := time.Now().Add(time.Hour)
 	date := NewISODate(soon)
 
