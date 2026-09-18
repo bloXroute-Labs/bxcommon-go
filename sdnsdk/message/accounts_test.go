@@ -24,8 +24,6 @@ func TestDefaultEliteAccountIsGraded(t *testing.T) {
 	assert.NotZero(t, DefaultAccountGrade)
 }
 
-// accountPayload is a trimmed bxapi response: date-only expire_date values, services the SDN
-// reports as null, optional bools left null, a large quota, and the 1970 expired sentinel.
 const accountPayload = `{
   "account_id": "13239207-7bec-4905-aec0-e8a00f3634ef",
   "logical_account_name": "cliff",
@@ -44,15 +42,12 @@ const accountPayload = `{
   "secret_hash": "***"
 }`
 
-// TestAccountExpireDates covers the three service models that carry an expiry. bxapi sends
-// expire_date as a calendar date, which a plain time.Time field cannot decode, and sends whole
-// services as null, which must degrade to expired rather than fail the account.
 func TestAccountExpireDates(t *testing.T) {
 	var account Account
 	require.NoError(t, json.Unmarshal([]byte(accountPayload), &account))
 
 	// BDNFeedService
-	assert.Equal(t, "2999-01-01", account.NewTransactionStreaming.ExpireDate.Format(types.TimeDateLayoutISO))
+	assert.Equal(t, "2999-01-01", account.NewTransactionStreaming.ExpireDate.String())
 	assert.True(t, account.NewTransactionStreaming.IsActive())
 	assert.Equal(t, 1, account.NewTransactionStreaming.Feed.Limit)
 	assert.False(t, account.InternalTransactionMinedStreaming.IsActive())
@@ -62,28 +57,20 @@ func TestAccountExpireDates(t *testing.T) {
 	assert.Equal(t, BDNServiceLimit(10), account.PaidTransactions.MsgQuota.Limit)
 	assert.Equal(t, BDNServiceLimit(1579712250000000000), account.PrivateTransactionFee.MsgQuota.Limit)
 
-	// bxapi sends is_miner as an optional bool; null is a no-op for a Go bool, which leaves
-	// it false - the same answer Python reaches by treating None as falsy
-	assert.False(t, account.Miner)
-
 	// BDNBasicService
 	assert.True(t, account.CloudAPI.IsActive())
 	assert.False(t, account.BoostMEVSearcher.IsActive())
 
-	// a service the SDN reports as null is expired, not a decode failure
-	assert.True(t, account.FreeTransactions.ExpireDate.Equal(types.ExpiredISODate.Time))
+	// null service
+	assert.Equal(t, types.ExpiredDate, account.FreeTransactions.ExpireDate.String())
 	assert.False(t, account.FreeTransactions.IsActive())
 	assert.False(t, account.PrivateOrdersStreaming.IsActive())
 
-	// the account's own expiry decodes the same way
-	assert.Equal(t, "2072-11-01", account.ExpireDate.Format(types.TimeDateLayoutISO))
+	assert.Equal(t, "2072-11-01", account.ExpireDate.String())
 	assert.False(t, account.IsExpired())
+	assert.False(t, account.Miner)
 }
 
-// TestBDNServiceLimitSaturates exercises the int64 boundary, which no real payload reaches:
-// the largest quota the SDN has been seen to send, 1579712250000000000, is well inside int64,
-// so the saturating path was never covered before. strconv returns the saturated value with
-// ErrRange, and the limit has to end up at that bound rather than at zero.
 func TestBDNServiceLimitSaturates(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -107,8 +94,6 @@ func TestBDNServiceLimitSaturates(t *testing.T) {
 	}
 }
 
-// TestBDNServiceLimitRejectsNonInteger: only an out-of-range value is saturated; anything
-// else is a parse failure, and the type assertion the old code did on that error path is gone.
 func TestBDNServiceLimitRejectsNonInteger(t *testing.T) {
 	for _, limit := range []string{`"10"`, `1e30`, `true`, `1.5`, `null`} {
 		var account Account
@@ -117,8 +102,6 @@ func TestBDNServiceLimitRejectsNonInteger(t *testing.T) {
 	}
 }
 
-// TestAccountMiner pins the optional bool bxapi sends as is_miner. Unlike trusted, null and
-// false mean the same thing here - not a miner - so a plain bool is enough.
 func TestAccountMiner(t *testing.T) {
 	for _, tc := range []struct {
 		payload string
@@ -133,15 +116,35 @@ func TestAccountMiner(t *testing.T) {
 		require.NoError(t, json.Unmarshal([]byte(tc.payload), &account), tc.payload)
 		assert.Equal(t, tc.miner, account.Miner, tc.payload)
 	}
-
-	// a miner is trusted even when trusted is explicitly false
-	var minerAccount Account
-	require.NoError(t, json.Unmarshal([]byte(`{"is_miner":true,"trusted":false}`), &minerAccount))
-	assert.True(t, minerAccount.IsTrusted())
 }
 
-// TestAccountIsExpired covers the account's own expire_date, which bxapi always sets and
-// always writes as a calendar date, using EPOCH_DATE for an account with no entitlement.
+func TestAccountTrusted(t *testing.T) {
+	for _, tc := range []struct {
+		payload string
+		trusted bool
+	}{
+		{payload: `{"trusted":true}`, trusted: true},
+		{payload: `{"trusted":false}`, trusted: false},
+		{payload: `{"trusted":false,"is_miner":true}`, trusted: true},
+		{payload: `{"trusted":null}`, trusted: true},
+		{payload: `{}`, trusted: true},
+	} {
+		var account Account
+		require.NoError(t, json.Unmarshal([]byte(tc.payload), &account))
+		assert.Equal(t, tc.trusted, account.IsTrusted(), tc.payload)
+	}
+
+	fallback := GetDefaultEliteAccount(time.Now().UTC())
+	assert.True(t, fallback.IsTrusted())
+}
+
+func TestAccountLogicalAccountName(t *testing.T) {
+	var account Account
+	require.NoError(t, json.Unmarshal([]byte(accountPayload), &account))
+
+	assert.Equal(t, "cliff", account.LogicalAccountName)
+}
+
 func TestAccountIsExpired(t *testing.T) {
 	for _, tc := range []struct {
 		expireDate string
@@ -161,9 +164,32 @@ func TestAccountIsExpired(t *testing.T) {
 	assert.False(t, fallback.IsExpired())
 }
 
-// TestAccountExpireDateRoundTrip pins the wire format, which the SDK writes to its on-disk
-// account cache and reads back: a null service comes back out as the expired sentinel, and
-// decoding what we encoded lands on the same value we started from.
+func TestAccountExpiryDayIsInclusive(t *testing.T) {
+	today := time.Now().UTC().Format(types.TimeDateLayoutISO)
+	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format(types.TimeDateLayoutISO)
+
+	var account Account
+	require.NoError(t, json.Unmarshal([]byte(
+		`{"cloud_api":{"expire_date":"`+today+`"},"eth_builder":{"expire_date":"`+yesterday+`"}}`), &account))
+
+	assert.True(t, account.CloudAPI.IsActive())
+	assert.False(t, account.EthBuilder.IsActive())
+}
+
+func TestAccountMalformedExpireDateIsolated(t *testing.T) {
+	var account Account
+	require.NoError(t, json.Unmarshal([]byte(
+		`{"cloud_api":{"expire_date":"2026-13-45"},"eth_builder":{"expire_date":"2999-01-01"},`+
+			`"tx_paid":{"expire_date":"2999-01-01","msg_quota":{"limit":7}}}`), &account))
+
+	assert.False(t, account.CloudAPI.IsActive())
+	assert.Equal(t, types.ExpiredDate, account.CloudAPI.ExpireDate.String())
+
+	assert.True(t, account.EthBuilder.IsActive())
+	assert.True(t, account.PaidTransactions.IsActive())
+	assert.Equal(t, BDNServiceLimit(7), account.PaidTransactions.MsgQuota.Limit)
+}
+
 func TestAccountExpireDateRoundTrip(t *testing.T) {
 	var account Account
 	require.NoError(t, json.Unmarshal([]byte(accountPayload), &account))
@@ -190,11 +216,6 @@ func TestAccountExpireDateRoundTrip(t *testing.T) {
 	var reread Account
 	require.NoError(t, json.Unmarshal(encoded, &reread))
 
-	// Every service the payload carries decodes to the same value the second time, which is
-	// what a cached account read back from disk has to satisfy. A service the payload omits
-	// entirely never reaches UnmarshalJSON, so it keeps Go's zero time on the first pass and
-	// normalizes to the sentinel here; both are expired, and the wire form is stable either
-	// way, which the re-encode below pins.
 	for name, dates := range map[string][2]types.ISODate{
 		"tx_free":                            {account.FreeTransactions.ExpireDate, reread.FreeTransactions.ExpireDate},
 		"tx_paid":                            {account.PaidTransactions.ExpireDate, reread.PaidTransactions.ExpireDate},
@@ -212,79 +233,6 @@ func TestAccountExpireDateRoundTrip(t *testing.T) {
 	assert.Equal(t, string(encoded), string(reencoded))
 }
 
-// TestAccountMalformedExpireDateIsolated mirrors bxapi, where an unreadable expire_date makes
-// is_service_valid return False for that service and leaves the rest of the account loaded.
-// Failing the whole json.Unmarshal instead would drop the caller onto the default elite
-// account for every service because of one bad field.
-func TestAccountMalformedExpireDateIsolated(t *testing.T) {
-	var account Account
-	require.NoError(t, json.Unmarshal([]byte(
-		`{"cloud_api":{"expire_date":"2026-13-45"},"eth_builder":{"expire_date":"2999-01-01"},`+
-			`"tx_paid":{"expire_date":"2999-01-01","msg_quota":{"limit":7}}}`), &account))
-
-	assert.False(t, account.CloudAPI.IsActive(), "the unreadable date invalidates its service")
-	assert.True(t, account.CloudAPI.ExpireDate.Equal(types.ExpiredISODate.Time))
-
-	assert.True(t, account.EthBuilder.IsActive(), "sibling services are unaffected")
-	assert.True(t, account.PaidTransactions.IsActive())
-	assert.Equal(t, BDNServiceLimit(7), account.PaidTransactions.MsgQuota.Limit,
-		"the rest of the failing service's siblings still decode")
-}
-
-// TestAccountExpiryDayIsInclusive pins the comparison against bxapi's is_service_valid,
-// which is expire_date >= utcnow().date(). Comparing instants against local wall time, as
-// this package used to, retired a service partway through the day it was still entitled to.
-func TestAccountExpiryDayIsInclusive(t *testing.T) {
-	today := time.Now().UTC().Format(types.TimeDateLayoutISO)
-	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format(types.TimeDateLayoutISO)
-
-	var account Account
-	require.NoError(t, json.Unmarshal([]byte(
-		`{"cloud_api":{"expire_date":"`+today+`"},"eth_builder":{"expire_date":"`+yesterday+`"}}`), &account))
-
-	assert.True(t, account.CloudAPI.IsActive(), "a service expiring today is valid all day")
-	assert.False(t, account.EthBuilder.IsActive())
-}
-
-// TestAccountTrusted covers the optional bool bxapi sends as "trusted". The field used to be
-// read from an "untrusted" key the SDN never sends, so it was never populated and every
-// account read as trusted; null keeps that, and an explicit false now takes effect.
-func TestAccountTrusted(t *testing.T) {
-	var nullTrusted Account
-	require.NoError(t, json.Unmarshal([]byte(accountPayload), &nullTrusted))
-	assert.Nil(t, nullTrusted.Trusted)
-	assert.True(t, nullTrusted.IsTrusted())
-
-	for _, tc := range []struct {
-		payload string
-		trusted bool
-	}{
-		{payload: `{"trusted":true}`, trusted: true},
-		{payload: `{"trusted":false}`, trusted: false},
-		{payload: `{"trusted":false,"is_miner":true}`, trusted: true},
-		{payload: `{}`, trusted: true},
-	} {
-		var account Account
-		require.NoError(t, json.Unmarshal([]byte(tc.payload), &account))
-		assert.Equal(t, tc.trusted, account.IsTrusted(), tc.payload)
-	}
-
-	fallback := GetDefaultEliteAccount(time.Now().UTC())
-	assert.True(t, fallback.IsTrusted())
-}
-
-// TestAccountLogicalAccountName pins the wire key, which is logical_account_name; the struct
-// used to read logical_account_id, so the field was always empty.
-func TestAccountLogicalAccountName(t *testing.T) {
-	var account Account
-	require.NoError(t, json.Unmarshal([]byte(accountPayload), &account))
-
-	assert.Equal(t, "cliff", account.LogicalAccountName)
-}
-
-// TestDefaultEliteAccountServicesAreActive guards the fallback account served during an SDN
-// outage. CloudAPI previously set BDNBasicService.ExpireDate (a string) while IsActive read
-// ExpireDateTime, so it was always inactive; one field per service removes that failure mode.
 func TestDefaultEliteAccountServicesAreActive(t *testing.T) {
 	account := GetDefaultEliteAccount(time.Now().UTC())
 
@@ -300,5 +248,5 @@ func TestDefaultEliteAccountServicesAreActive(t *testing.T) {
 		assert.True(t, service.IsActive(), name)
 	}
 
-	assert.False(t, account.BoostMEVSearcher.IsActive(), "BoostMEVSearcher is expired on purpose")
+	assert.False(t, account.BoostMEVSearcher.IsActive())
 }

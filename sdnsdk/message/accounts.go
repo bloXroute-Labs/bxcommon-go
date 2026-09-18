@@ -157,10 +157,8 @@ type BDNQuotaService struct {
 	ExpireDate types.ISODate `json:"expire_date"`
 }
 
-// UnmarshalJSON implements deserialization for BDNServiceLimit. A quota outside int64 is
-// saturated instead of failing the account: strconv.ParseInt already returns MaxInt64 or
-// MinInt64 alongside ErrRange, with the right sign, so the parsed value is used as-is.
-// Any other parse failure is reported.
+// UnmarshalJSON saturates a quota outside int64: ParseInt already returns the bound with
+// ErrRange, so its value is used as-is. Any other parse failure is reported.
 func (i *BDNServiceLimit) UnmarshalJSON(b []byte) error {
 	limit, err := json.Number(b).Int64()
 	if err != nil && !errors.Is(err, strconv.ErrRange) {
@@ -175,10 +173,8 @@ func (i *BDNServiceLimit) UnmarshalJSON(b []byte) error {
 // nullJSON is the literal bxapi sends for a service an account is not provisioned for.
 const nullJSON = "null"
 
-// UnmarshalJSON implements deserialization for BDNQuotaService. bxapi sends a service the
-// account is not provisioned for as JSON null, which the default struct decoding would leave
-// at the Go zero value; decoding it to the expired date instead preserves what the SDN means
-// and keeps a decode/encode/decode cycle idempotent for the SDK's on-disk account cache.
+// UnmarshalJSON decodes a service bxapi sent as null to the expired date rather than leaving
+// it at the Go zero value, which keeps a decode/encode/decode cycle idempotent.
 func (bdnQS *BDNQuotaService) UnmarshalJSON(b []byte) error {
 	if string(b) == nullJSON {
 		*bdnQS = BDNQuotaService{ExpireDate: types.ExpiredISODate}
@@ -186,9 +182,7 @@ func (bdnQS *BDNQuotaService) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	// the local type strips the method set to avoid recursing, and keeps every field and
-	// struct tag, so adding a field here needs no change to this method
-	type quotaService BDNQuotaService
+	type quotaService BDNQuotaService // strips the method set to avoid recursing
 
 	var qs quotaService
 	if err := json.Unmarshal(b, &qs); err != nil {
@@ -230,8 +224,7 @@ type BDNBasicService struct {
 	ExpireDate types.ISODate `json:"expire_date"`
 }
 
-// UnmarshalJSON implements deserialization for BDNBasicService; see BDNQuotaService for why
-// a JSON null decodes to the expired date.
+// UnmarshalJSON decodes a null service to the expired date; see BDNQuotaService.
 func (bdnbs *BDNBasicService) UnmarshalJSON(b []byte) error {
 	if string(b) == nullJSON {
 		*bdnbs = BDNBasicService{ExpireDate: types.ExpiredISODate}
@@ -239,7 +232,7 @@ func (bdnbs *BDNBasicService) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	type basicService BDNBasicService
+	type basicService BDNBasicService // strips the method set to avoid recursing
 
 	var bs basicService
 	if err := json.Unmarshal(b, &bs); err != nil {
@@ -263,8 +256,7 @@ type BDNFeedService struct {
 	AllowedNetworks []string       `json:"allowed_networks"`
 }
 
-// UnmarshalJSON implements deserialization for BDNFeedService; see BDNQuotaService for why
-// a JSON null decodes to the expired date.
+// UnmarshalJSON decodes a null service to the expired date; see BDNQuotaService.
 func (bdnFS *BDNFeedService) UnmarshalJSON(b []byte) error {
 	if string(b) == nullJSON {
 		*bdnFS = BDNFeedService{ExpireDate: types.ExpiredISODate}
@@ -272,7 +264,7 @@ func (bdnFS *BDNFeedService) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	type feedService BDNFeedService
+	type feedService BDNFeedService // strips the method set to avoid recursing
 
 	var fs feedService
 	if err := json.Unmarshal(b, &fs); err != nil {
@@ -436,14 +428,11 @@ type AccountInfo struct {
 // traffic to a restricted tier's policy for the length of an SDN outage.
 const DefaultAccountGrade = 100
 
-// IsTrusted indicates whether the account is trusted. bxapi sends trusted as an
-// optional bool; an absent or null value is treated as trusted, and only an explicit
-// false makes an account untrusted. Miners are always trusted.
+// IsTrusted indicates whether the account is trusted. bxapi sends trusted as an optional
+// bool; absent or null counts as trusted, and miners are always trusted.
 func (a *Account) IsTrusted() bool { return a.Trusted == nil || *a.Trusted || a.Miner }
 
-// IsExpired indicates whether the account itself has expired, on the same terms as a
-// service: calendar dates in UTC with the expiry day still valid. bxapi always sets
-// expire_date, using EPOCH_DATE ("1970-01-01") for an account with no entitlement.
+// IsExpired indicates whether the account itself has expired, on the same terms as a service.
 func (a *AccountInfo) IsExpired() bool { return a.ExpireDate.Expired() }
 
 // GetDefaultEliteAccount get a default elite account by current time.

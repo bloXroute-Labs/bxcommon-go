@@ -19,7 +19,7 @@ func TestISODateUnmarshal(t *testing.T) {
 		name string
 		in   string
 		want string // TimeDateLayoutISO
-		zero bool   // the key never reached UnmarshalJSON, so the field stays at its zero value
+		zero bool
 	}{
 		{name: "date", in: `{"expire_date":"2076-03-23"}`, want: "2076-03-23"},
 		{name: "expired sentinel", in: `{"expire_date":"1970-01-01"}`, want: ExpiredDate},
@@ -34,7 +34,6 @@ func TestISODateUnmarshal(t *testing.T) {
 			assert.Equal(t, tc.zero, h.ExpireDate.IsZero())
 
 			if tc.zero {
-				// the zero value is expired too, and reaches the wire as the sentinel
 				b, err := json.Marshal(h)
 				require.NoError(t, err)
 				assert.JSONEq(t, `{"expire_date":"1970-01-01"}`, string(b))
@@ -52,8 +51,6 @@ func TestISODateUnmarshalFallsBackOnMalformed(t *testing.T) {
 	for _, in := range []string{
 		`{"expire_date":"2026-13-45"}`,
 		`{"expire_date":"23/03/2076"}`,
-		// RFC 3339 is not accepted either: bxapi writes expire_date with date.isoformat(),
-		// so a timestamp would mean the contract changed, not that this service is current.
 		`{"expire_date":"2026-01-02T00:00:00Z"}`,
 		`{"expire_date":12345}`,
 		`{"expire_date":{"nested":true}}`,
@@ -73,7 +70,6 @@ func TestParseISODateIsStrict(t *testing.T) {
 	var d ISODate
 	assert.ErrorIs(t, d.UnmarshalText([]byte("nonsense")), ErrInvalidDate)
 
-	// the empty value is reported too, rather than mapped onto the expired sentinel
 	assert.ErrorIs(t, d.UnmarshalText(nil), ErrInvalidDate)
 	assert.ErrorIs(t, d.UnmarshalText([]byte("")), ErrInvalidDate)
 }
@@ -90,7 +86,6 @@ func TestISODateAsJSONMapKey(t *testing.T) {
 	require.NoError(t, json.Unmarshal(b, &round))
 	assert.Equal(t, 1, round[date])
 
-	// unreadable keys do not fail, they collapse onto ExpiredISODate
 	var collapsed map[ISODate]int
 	require.NoError(t, json.Unmarshal([]byte(`{"":1,"1970-01-01":2}`), &collapsed))
 	assert.Len(t, collapsed, 1, "the empty key collapses onto the expired sentinel")
@@ -112,8 +107,6 @@ func TestISODateExpired(t *testing.T) {
 		{name: "day before", now: time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)},
 		{name: "expiry day, start", now: time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)},
 		{name: "expiry day, end", now: time.Date(2026, 9, 17, 23, 59, 59, 0, time.UTC)},
-		// the case the old instant comparison got wrong: past 03:00 in Kyiv the wall clock
-		// is ahead of UTC midnight, and the service was retired most of a day early
 		{name: "expiry day, Kyiv morning", now: time.Date(2026, 9, 17, 4, 0, 0, 0, kyiv)},
 		{name: "expiry day, Kyiv evening", now: time.Date(2026, 9, 17, 23, 0, 0, 0, kyiv)},
 		{name: "day after", now: time.Date(2026, 9, 18, 0, 0, 0, 0, time.UTC), expired: true},
@@ -209,8 +202,6 @@ func TestISODateTextCodec(t *testing.T) {
 }
 
 func TestNewISODateKeepsTimeOfDay(t *testing.T) {
-	// Only the wire format is date-granular. A service expiring later today must still
-	// read as unexpired in memory, which is what the in-process defaults rely on.
 	soon := time.Now().Add(time.Hour)
 	date := NewISODate(soon)
 
