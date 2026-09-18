@@ -70,9 +70,7 @@ func (d *ISODate) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON implements serialization for ISODate. The zero value is written as
-// ExpiredDate, so a service left at its zero value in Go lands on the wire as the
-// expired date rather than as year 1.
+// MarshalJSON implements serialization for ISODate.
 func (d ISODate) MarshalJSON() ([]byte, error) {
 	if d.IsZero() {
 		return json.Marshal(ExpiredDate)
@@ -81,9 +79,7 @@ func (d ISODate) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Format(TimeDateLayoutISO))
 }
 
-// MarshalText implements encoding.TextMarshaler so that an ISODate used as a JSON map
-// key, or handed to any encoder that looks for a TextMarshaler, uses the same format as
-// MarshalJSON instead of the RFC 3339 one promoted from time.Time.
+// MarshalText implements encoding.TextMarshaler
 func (d ISODate) MarshalText() ([]byte, error) {
 	if d.IsZero() {
 		return []byte(ExpiredDate), nil
@@ -92,15 +88,8 @@ func (d ISODate) MarshalText() ([]byte, error) {
 	return []byte(d.Format(TimeDateLayoutISO)), nil
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler, the counterpart to MarshalText. It
-// reports a malformed date, unlike UnmarshalJSON, since its caller is decoding a map key
-// and collapsing several unreadable keys onto one value would lose entries.
+// UnmarshalText implements encoding.TextUnmarshaler, the counterpart to MarshalText.
 func (d *ISODate) UnmarshalText(b []byte) error {
-	if len(b) == 0 {
-		*d = ExpiredISODate
-		return nil
-	}
-
 	parsed, err := ParseISODate(string(b))
 	if err != nil {
 		return err

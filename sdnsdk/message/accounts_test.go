@@ -2,6 +2,7 @@ package message
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -24,8 +25,7 @@ func TestDefaultEliteAccountIsGraded(t *testing.T) {
 }
 
 // accountPayload is a trimmed bxapi response: date-only expire_date values, services the SDN
-// reports as null, an optional bool left null, a quota that overflows int64, and the 1970
-// expired sentinel.
+// reports as null, optional bools left null, a large quota, and the 1970 expired sentinel.
 const accountPayload = `{
   "account_id": "13239207-7bec-4905-aec0-e8a00f3634ef",
   "logical_account_name": "cliff",
@@ -62,6 +62,10 @@ func TestAccountExpireDates(t *testing.T) {
 	assert.Equal(t, BDNServiceLimit(10), account.PaidTransactions.MsgQuota.Limit)
 	assert.Equal(t, BDNServiceLimit(1579712250000000000), account.PrivateTransactionFee.MsgQuota.Limit)
 
+	// bxapi sends is_miner as an optional bool; null is a no-op for a Go bool, which leaves
+	// it false - the same answer Python reaches by treating None as falsy
+	assert.False(t, account.Miner)
+
 	// BDNBasicService
 	assert.True(t, account.CloudAPI.IsActive())
 	assert.False(t, account.BoostMEVSearcher.IsActive())
@@ -74,6 +78,66 @@ func TestAccountExpireDates(t *testing.T) {
 	// the account's own expiry decodes the same way
 	assert.Equal(t, "2072-11-01", account.ExpireDate.Format(types.TimeDateLayoutISO))
 	assert.False(t, account.IsExpired())
+}
+
+// TestBDNServiceLimitSaturates exercises the int64 boundary, which no real payload reaches:
+// the largest quota the SDN has been seen to send, 1579712250000000000, is well inside int64,
+// so the saturating path was never covered before. strconv returns the saturated value with
+// ErrRange, and the limit has to end up at that bound rather than at zero.
+func TestBDNServiceLimitSaturates(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		limit string
+		want  BDNServiceLimit
+	}{
+		{name: "in range", limit: "1579712250000000000", want: 1579712250000000000},
+		{name: "max int64", limit: "9223372036854775807", want: math.MaxInt64},
+		{name: "one over max", limit: "9223372036854775808", want: math.MaxInt64},
+		{name: "far over max", limit: "99999999999999999999999", want: math.MaxInt64},
+		{name: "negative", limit: "-5", want: -5},
+		{name: "min int64", limit: "-9223372036854775808", want: math.MinInt64},
+		{name: "far under min", limit: "-99999999999999999999999", want: math.MinInt64},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var account Account
+			require.NoError(t, json.Unmarshal([]byte(
+				`{"tx_paid":{"expire_date":"2999-01-01","msg_quota":{"limit":`+tc.limit+`}}}`), &account))
+			assert.Equal(t, tc.want, account.PaidTransactions.MsgQuota.Limit)
+		})
+	}
+}
+
+// TestBDNServiceLimitRejectsNonInteger: only an out-of-range value is saturated; anything
+// else is a parse failure, and the type assertion the old code did on that error path is gone.
+func TestBDNServiceLimitRejectsNonInteger(t *testing.T) {
+	for _, limit := range []string{`"10"`, `1e30`, `true`, `1.5`, `null`} {
+		var account Account
+		assert.Error(t, json.Unmarshal([]byte(
+			`{"tx_paid":{"expire_date":"2999-01-01","msg_quota":{"limit":`+limit+`}}}`), &account), limit)
+	}
+}
+
+// TestAccountMiner pins the optional bool bxapi sends as is_miner. Unlike trusted, null and
+// false mean the same thing here - not a miner - so a plain bool is enough.
+func TestAccountMiner(t *testing.T) {
+	for _, tc := range []struct {
+		payload string
+		miner   bool
+	}{
+		{payload: `{"is_miner":null}`},
+		{payload: `{"is_miner":false}`},
+		{payload: `{}`},
+		{payload: `{"is_miner":true}`, miner: true},
+	} {
+		var account Account
+		require.NoError(t, json.Unmarshal([]byte(tc.payload), &account), tc.payload)
+		assert.Equal(t, tc.miner, account.Miner, tc.payload)
+	}
+
+	// a miner is trusted even when trusted is explicitly false
+	var minerAccount Account
+	require.NoError(t, json.Unmarshal([]byte(`{"is_miner":true,"trusted":false}`), &minerAccount))
+	assert.True(t, minerAccount.IsTrusted())
 }
 
 // TestAccountIsExpired covers the account's own expire_date, which bxapi always sets and

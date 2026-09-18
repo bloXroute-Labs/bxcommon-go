@@ -47,10 +47,6 @@ func TestISODateUnmarshal(t *testing.T) {
 	}
 }
 
-// TestISODateUnmarshalFallsBackOnMalformed pins bxapi's own handling: its model loader keeps
-// expire_date as a string and only parses it when asked whether the service is valid, where
-// an unreadable date returns False. So a bad date has to invalidate its own service, not fail
-// the account it arrived in.
 func TestISODateUnmarshalFallsBackOnMalformed(t *testing.T) {
 	for _, in := range []string{
 		`{"expire_date":"2026-13-45"}`,
@@ -68,8 +64,6 @@ func TestISODateUnmarshalFallsBackOnMalformed(t *testing.T) {
 	}
 }
 
-// TestParseISODateIsStrict: the explicit parse path still reports a bad date, so callers that
-// want to validate rather than degrade have a way to.
 func TestParseISODateIsStrict(t *testing.T) {
 	_, err := ParseISODate("2026-13-45")
 	require.Error(t, err)
@@ -77,12 +71,33 @@ func TestParseISODateIsStrict(t *testing.T) {
 
 	var d ISODate
 	assert.ErrorIs(t, d.UnmarshalText([]byte("nonsense")), ErrInvalidDate)
+
+	// the empty value is reported too, rather than mapped onto the expired sentinel
+	assert.ErrorIs(t, d.UnmarshalText(nil), ErrInvalidDate)
+	assert.ErrorIs(t, d.UnmarshalText([]byte("")), ErrInvalidDate)
 }
 
-// TestISODateExpired pins the comparison against bxapi's is_service_valid, which is
-// `expire_date >= datetime.utcnow().date()`: calendar dates in UTC, expiry day inclusive.
+func TestISODateAsJSONMapKey(t *testing.T) {
+	date, err := ParseISODate("2076-03-23")
+	require.NoError(t, err)
+
+	b, err := json.Marshal(map[ISODate]int{date: 1})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"2076-03-23":1}`, string(b))
+
+	var round map[ISODate]int
+	require.NoError(t, json.Unmarshal(b, &round))
+	assert.Equal(t, 1, round[date])
+
+	// unreadable keys do not fail, they collapse onto ExpiredISODate
+	var collapsed map[ISODate]int
+	require.NoError(t, json.Unmarshal([]byte(`{"":1,"1970-01-01":2}`), &collapsed))
+	assert.Len(t, collapsed, 1, "the empty key collapses onto the expired sentinel")
+	assert.Equal(t, 2, collapsed[ExpiredISODate])
+}
+
 func TestISODateExpired(t *testing.T) {
-	kyiv, err := time.LoadLocation("Europe/Kiev")
+	kyiv, err := time.LoadLocation("Europe/Kyiv")
 	require.NoError(t, err)
 
 	expire, err := ParseISODate("2026-09-17")
@@ -126,9 +141,6 @@ func TestISODateMarshal(t *testing.T) {
 	assert.JSONEq(t, `{"expire_date":"1970-01-01"}`, string(b))
 }
 
-// TestISODateDecodeIsIdempotent pins the property the SDK's on-disk account cache relies
-// on: decoding a value, re-encoding it and decoding it again must land on the same value.
-// Decoding null to the zero time instead of the sentinel would break this.
 func TestISODateDecodeIsIdempotent(t *testing.T) {
 	for _, in := range []string{
 		`{"expire_date":"2999-01-01"}`,
@@ -166,9 +178,6 @@ func TestISODateRoundTrip(t *testing.T) {
 	}
 }
 
-// TestISODateTextCodec guards against the RFC 3339 MarshalText promoted from the embedded
-// time.Time leaking into contexts that use a TextMarshaler rather than a JSON one, such as
-// a map key, where the same value would otherwise serialize two different ways.
 func TestISODateTextCodec(t *testing.T) {
 	date, err := ParseISODate("2076-03-23")
 	require.NoError(t, err)
@@ -183,8 +192,6 @@ func TestISODateTextCodec(t *testing.T) {
 }
 
 func TestNewISODateKeepsTimeOfDay(t *testing.T) {
-	// Only the wire format is date-granular. A service expiring later today must still
-	// read as unexpired in memory, which is what the in-process defaults rely on.
 	soon := time.Now().Add(time.Hour)
 	date := NewISODate(soon)
 
@@ -192,11 +199,6 @@ func TestNewISODateKeepsTimeOfDay(t *testing.T) {
 	assert.Equal(t, soon.Format(TimeDateLayoutISO), date.Format(TimeDateLayoutISO))
 }
 
-// TestISODateAbsentKeyNormalizesOnce documents the one case that is not equal on the first
-// pass: a key missing from the payload never reaches UnmarshalJSON, so the field keeps Go's
-// zero time, which encodes as the sentinel and decodes back as the sentinel. Both values are
-// expired - and bxapi has no zero-date state at all, its loader leaves an absent service as
-// None - so this is cosmetic, and everything is stable from the second decode on.
 func TestISODateAbsentKeyNormalizesOnce(t *testing.T) {
 	var first dateHolder
 	require.NoError(t, json.Unmarshal([]byte(`{}`), &first))

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"strconv"
 	"time"
 
@@ -94,7 +93,8 @@ func (at AccountTier) IsValid() error {
 // TimeIntervalType represents an time interval type
 type TimeIntervalType string
 
-// BDNServiceLimit represents large integer that can hold number bigger than math.MaxBigInt and also negative numbers
+// BDNServiceLimit represents a quota, saturating at the int64 bounds for values the SDN
+// sends outside them. It can be negative.
 type BDNServiceLimit int64
 
 // TimeIntervalType enumeration
@@ -157,17 +157,18 @@ type BDNQuotaService struct {
 	ExpireDate types.ISODate `json:"expire_date"`
 }
 
-// UnmarshalJSON implements deserialization for BDNServiceLimit, clamping a value that
-// overflows int64 to math.MaxInt64 rather than failing the whole account.
+// UnmarshalJSON implements deserialization for BDNServiceLimit. A quota outside int64 is
+// saturated instead of failing the account: strconv.ParseInt already returns MaxInt64 or
+// MinInt64 alongside ErrRange, with the right sign, so the parsed value is used as-is.
+// Any other parse failure is reported.
 func (i *BDNServiceLimit) UnmarshalJSON(b []byte) error {
-	stringElement := json.Number(b)
-	limit, err := stringElement.Int64()
-	if err != nil && errors.Is(err.(*strconv.NumError).Err, strconv.ErrRange) {
-		*i = math.MaxInt64
-	} else if err != nil {
+	limit, err := json.Number(b).Int64()
+	if err != nil && !errors.Is(err, strconv.ErrRange) {
 		return err
 	}
+
 	*i = BDNServiceLimit(limit)
+
 	return nil
 }
 
