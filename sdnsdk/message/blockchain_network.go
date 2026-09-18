@@ -3,7 +3,7 @@ package message
 import (
 	"fmt"
 
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // BlockchainAttributes represents blockchain network attributes

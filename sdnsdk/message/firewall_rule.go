@@ -3,7 +3,7 @@ package message
 import (
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // FirewallRule is SDN P2P message that sent to proxy

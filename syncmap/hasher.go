@@ -3,7 +3,7 @@ package syncmap
 import (
 	"hash/maphash"
 
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // Hasher type of hasher functions

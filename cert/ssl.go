@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // SSLCerts represents the required certificate files for interacting with the BDN.

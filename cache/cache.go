@@ -6,8 +6,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/clock"
-	"github.com/bloXroute-Labs/bxcommon-go/syncmap"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/clock"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/syncmap"
 )
 
 const defaultBypass = time.Second * 10

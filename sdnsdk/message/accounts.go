@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // AccountRequest represents a request to bxapi for account details

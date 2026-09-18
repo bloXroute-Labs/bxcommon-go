@@ -1,4 +1,4 @@
-module github.com/bloXroute-Labs/bxcommon-go
+module github.com/bloXroute-Labs/bxcommon-go/v2
 
 go 1.26.8
 
