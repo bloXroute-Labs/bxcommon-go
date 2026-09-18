@@ -71,8 +71,30 @@ func TestAccountExpireDates(t *testing.T) {
 	assert.False(t, account.FreeTransactions.IsActive())
 	assert.False(t, account.PrivateOrdersStreaming.IsActive())
 
-	// the account-level expire_date is still a plain string
-	assert.Equal(t, "2072-11-01", account.ExpireDate)
+	// the account's own expiry decodes the same way
+	assert.Equal(t, "2072-11-01", account.ExpireDate.Format(types.TimeDateLayoutISO))
+	assert.False(t, account.IsExpired())
+}
+
+// TestAccountIsExpired covers the account's own expire_date, which bxapi always sets and
+// always writes as a calendar date, using EPOCH_DATE for an account with no entitlement.
+func TestAccountIsExpired(t *testing.T) {
+	for _, tc := range []struct {
+		expireDate string
+		expired    bool
+	}{
+		{expireDate: "2072-11-01"},
+		{expireDate: time.Now().UTC().Format(types.TimeDateLayoutISO)},
+		{expireDate: time.Now().UTC().AddDate(0, 0, -1).Format(types.TimeDateLayoutISO), expired: true},
+		{expireDate: types.ExpiredDate, expired: true},
+	} {
+		var account Account
+		require.NoError(t, json.Unmarshal([]byte(`{"expire_date":"`+tc.expireDate+`"}`), &account))
+		assert.Equal(t, tc.expired, account.IsExpired(), tc.expireDate)
+	}
+
+	fallback := GetDefaultEliteAccount(time.Now().UTC())
+	assert.False(t, fallback.IsExpired())
 }
 
 // TestAccountExpireDateRoundTrip pins the wire format, which the SDK writes to its on-disk

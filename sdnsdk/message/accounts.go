@@ -409,7 +409,7 @@ type AccountInfo struct {
 	AccountID          types.AccountID `json:"account_id"`
 	LogicalAccountName string          `json:"logical_account_name"`
 	Certificate        string          `json:"certificate"`
-	ExpireDate         string          `json:"expire_date"`
+	ExpireDate         types.ISODate   `json:"expire_date"`
 	BlockchainProtocol string          `json:"blockchain_protocol"`
 	BlockchainNetwork  string          `json:"blockchain_network"`
 	TierName           AccountTier     `json:"tier_name"`
@@ -440,6 +440,11 @@ const DefaultAccountGrade = 100
 // false makes an account untrusted. Miners are always trusted.
 func (a *Account) IsTrusted() bool { return a.Trusted == nil || *a.Trusted || a.Miner }
 
+// IsExpired indicates whether the account itself has expired, on the same terms as a
+// service: calendar dates in UTC with the expiry day still valid. bxapi always sets
+// expire_date, using EPOCH_DATE ("1970-01-01") for an account with no entitlement.
+func (a *AccountInfo) IsExpired() bool { return a.ExpireDate.Expired() }
+
 // GetDefaultEliteAccount get a default elite account by current time.
 //
 // Both per-chain grades are set to DefaultAccountGrade rather than left at the zero value -
@@ -450,7 +455,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			AccountID:          "",
 			LogicalAccountName: "",
 			Certificate:        "",
-			ExpireDate:         now.AddDate(0, 0, 1).Format("2006-01-02"),
+			ExpireDate:         types.NewISODate(now.AddDate(0, 0, 1)),
 			BlockchainProtocol: "Ethereum",
 			BlockchainNetwork:  "Mainnet",
 			TierName:           ATierElite,
