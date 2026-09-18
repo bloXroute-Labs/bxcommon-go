@@ -19,10 +19,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/cert"
-	log "github.com/bloXroute-Labs/bxcommon-go/logger"
-	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/cert"
+	log "github.com/bloXroute-Labs/bxcommon-go/v2/logger"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/sdnsdk/message"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 var (

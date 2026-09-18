@@ -24,12 +24,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/bloXroute-Labs/bxcommon-go/cache"
-	"github.com/bloXroute-Labs/bxcommon-go/cert"
-	"github.com/bloXroute-Labs/bxcommon-go/clock"
-	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
-	"github.com/bloXroute-Labs/bxcommon-go/syncmap"
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/cache"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/cert"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/clock"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/sdnsdk/message"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/syncmap"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 type handlerArgs struct {

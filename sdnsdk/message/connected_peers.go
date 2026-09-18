@@ -1,7 +1,7 @@
 package message
 
 import (
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // ConnectedPeer represents info about a connected peer to a relay

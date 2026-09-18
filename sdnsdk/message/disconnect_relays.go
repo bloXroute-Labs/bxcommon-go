@@ -1,7 +1,7 @@
 package message
 
 import (
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // DisconnectRelays represents the set of connections for the relay to disconnect, as sent down

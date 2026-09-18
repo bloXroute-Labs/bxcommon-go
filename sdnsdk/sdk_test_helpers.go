@@ -6,7 +6,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/cert"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/cert"
 )
 
 const (
