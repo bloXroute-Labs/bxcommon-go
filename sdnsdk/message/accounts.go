@@ -459,7 +459,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				ServiceType:  BDNServiceMsgQuota,
 				Limit:        1,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		PaidTransactions: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -467,7 +467,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				ServiceType:  BDNServiceMsgQuota,
 				Limit:        1,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		CloudAPI: BDNBasicService{
 			ExpireDate: types.NewISODate(now.AddDate(0, 0, 1)),
@@ -545,7 +545,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				ServiceType:  BDNServiceMsgQuota,
 				Limit:        1,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		UnpaidTransactionBurstLimit: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -554,7 +554,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		PaidTransactionBurstLimit: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -563,7 +563,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorAlert,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BoostMEVSearcher: BDNBasicService{
 			ExpireDate: types.ExpiredISODate,
@@ -573,21 +573,21 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				ServiceType: BDNServicePermit,
 				Limit:       2,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		MaxAllowedNodes: BDNQuotaService{
 			MsgQuota: BDNService{
 				ServiceType: BDNServicePermit,
 				Limit:       2,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		InboundNodeConnections: BDNQuotaService{
 			MsgQuota: BDNService{
 				ServiceType: BDNServiceMsgQuota,
 				Limit:       20,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 
 		SolanaDexAPIRateLimit: BDNQuotaService{
@@ -595,14 +595,14 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				ServiceType: BDNServicePermit,
 				Limit:       100,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		SolanaDexAPIStreamLimit: BDNQuotaService{
 			MsgQuota: BDNService{
 				ServiceType: BDNServicePermit,
 				Limit:       50,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		PrivateOrdersStreaming: BDNFeedService{
 			ExpireDate: types.NewISODate(now.AddDate(0, 0, 1)),
@@ -671,7 +671,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		EthBlocksStreaming: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -681,13 +681,13 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		EthMevStreaming: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		EthBundleSimulation: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 
 		BscMempoolStreaming: BDNQuotaService{
@@ -698,7 +698,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BscBlocksStreaming: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -708,7 +708,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BscTxReceiptsStreaming: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -718,16 +718,16 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BscBundleSimulation: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BscBigBundles: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BscBoosterNetwork: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 
 		BaseFlashblocksStreaming: BDNQuotaService{
@@ -738,7 +738,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BaseParsedFlashblocksStreaming: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -748,10 +748,10 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BaseBoosterNetwork: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BaseStateDiffStreaming: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -761,7 +761,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 
 		OnlineSolanaGateways: BDNQuotaService{
@@ -772,7 +772,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		SolanaShredStreams: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -782,7 +782,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		SolanaTxStreamers: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -792,7 +792,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		SolanaTraderApiCredits: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -802,7 +802,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 
 		TxTraceRateLimitation: BDNQuotaService{
@@ -811,7 +811,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				ServiceType:  BDNServiceMsgQuota,
 				Limit:        1,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		BundleTraceRateLimitation: BDNQuotaService{
 			MsgQuota: BDNService{
@@ -821,7 +821,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				BehaviorLimitOK:   BehaviorNoAction,
 				BehaviorLimitFail: BehaviorNoAction,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 
 		OnlineGateways: BDNQuotaService{
@@ -830,7 +830,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 				ServiceType:  BDNServiceMsgQuota,
 				Limit:        1,
 			},
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		MinAllowedNodes: BDNMinAllowedNodesService{
 			BDNQuotaService: BDNQuotaService{
@@ -838,14 +838,14 @@ func GetDefaultEliteAccount(now time.Time) Account {
 					ServiceType: BDNServicePermit,
 					Limit:       0,
 				},
-				ExpireDate: types.NewISODate(now.Add(time.Hour)),
+				ExpireDate: types.NewISODate(now),
 			},
 		},
 		BDNPrivateRegions: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 		EthBuilder: BDNBasicService{
-			ExpireDate: types.NewISODate(now.Add(time.Hour)),
+			ExpireDate: types.NewISODate(now),
 		},
 	}
 }

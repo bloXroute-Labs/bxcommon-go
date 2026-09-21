@@ -38,8 +38,8 @@ func ParseISODate(s string) (ISODate, error) {
 	return ISODate{Time: t}, nil
 }
 
-// Expired reports whether the date has passed, the way bxapi decides it: calendar dates in
-// UTC, with the expiry day itself still valid (expire_date >= today).
+// Expired reports whether expire_date < today, comparing calendar dates in UTC. It is the
+// negation of bxapi's is_service_valid, so the expiry day itself is still valid.
 func (d ISODate) Expired() bool {
 	return d.expiredAt(time.Now())
 }
