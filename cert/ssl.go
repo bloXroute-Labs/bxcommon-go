@@ -258,6 +258,10 @@ func (s *SSLCerts) SavePrivateCert(privateCert string) error {
 	}
 	s.privateKeyPair = &privateKeyPair
 
+	if s.privateCertFile == "" {
+		return nil
+	}
+
 	return os.WriteFile(s.privateCertFile, privateCertBytes, 0644)
 }
 

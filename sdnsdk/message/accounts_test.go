@@ -215,18 +215,7 @@ func TestAccountExpireDateRoundTrip(t *testing.T) {
 
 	var reread Account
 	require.NoError(t, json.Unmarshal(encoded, &reread))
-
-	for name, dates := range map[string][2]types.ISODate{
-		"tx_free":                            {account.FreeTransactions.ExpireDate, reread.FreeTransactions.ExpireDate},
-		"tx_paid":                            {account.PaidTransactions.ExpireDate, reread.PaidTransactions.ExpireDate},
-		"cloud_api":                          {account.CloudAPI.ExpireDate, reread.CloudAPI.ExpireDate},
-		"new_transaction_streaming":          {account.NewTransactionStreaming.ExpireDate, reread.NewTransactionStreaming.ExpireDate},
-		"new_internal_transaction_streaming": {account.InternalTransactionMinedStreaming.ExpireDate, reread.InternalTransactionMinedStreaming.ExpireDate},
-		"private_orders_streaming":           {account.PrivateOrdersStreaming.ExpireDate, reread.PrivateOrdersStreaming.ExpireDate},
-		"boost_mevsearcher":                  {account.BoostMEVSearcher.ExpireDate, reread.BoostMEVSearcher.ExpireDate},
-	} {
-		assert.True(t, dates[1].Equal(dates[0].Time), name)
-	}
+	assert.Equal(t, account, reread)
 
 	reencoded, err := json.Marshal(reread)
 	require.NoError(t, err)

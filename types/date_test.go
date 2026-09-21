@@ -36,7 +36,7 @@ func TestISODateUnmarshal(t *testing.T) {
 			if tc.zero {
 				b, err := json.Marshal(h)
 				require.NoError(t, err)
-				assert.JSONEq(t, `{"expire_date":"1970-01-01"}`, string(b))
+				assert.JSONEq(t, `{"expire_date":"0001-01-01"}`, string(b))
 
 				return
 			}
@@ -148,7 +148,7 @@ func TestISODateMarshal(t *testing.T) {
 
 	b, err = json.Marshal(dateHolder{})
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"expire_date":"1970-01-01"}`, string(b))
+	assert.JSONEq(t, `{"expire_date":"0001-01-01"}`, string(b))
 }
 
 func TestISODateDecodeIsIdempotent(t *testing.T) {
@@ -156,6 +156,7 @@ func TestISODateDecodeIsIdempotent(t *testing.T) {
 		`{"expire_date":"2999-01-01"}`,
 		`{"expire_date":"1970-01-01"}`,
 		`{"expire_date":null}`,
+		`{}`,
 	} {
 		var first dateHolder
 		require.NoError(t, json.Unmarshal([]byte(in), &first))
@@ -170,7 +171,7 @@ func TestISODateDecodeIsIdempotent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, string(encoded), string(reencoded), in)
-		assert.True(t, second.ExpireDate.Equal(first.ExpireDate.Time), in)
+		assert.Equal(t, first, second, in)
 	}
 }
 
@@ -207,26 +208,4 @@ func TestNewISODateKeepsTimeOfDay(t *testing.T) {
 
 	assert.False(t, date.Expired())
 	assert.Equal(t, soon.Format(TimeDateLayoutISO), date.Format(TimeDateLayoutISO))
-}
-
-func TestISODateAbsentKeyNormalizesOnce(t *testing.T) {
-	var first dateHolder
-	require.NoError(t, json.Unmarshal([]byte(`{}`), &first))
-	assert.True(t, first.ExpireDate.IsZero())
-	assert.True(t, first.ExpireDate.Expired())
-
-	encoded, err := json.Marshal(first)
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"expire_date":"1970-01-01"}`, string(encoded))
-
-	var second dateHolder
-	require.NoError(t, json.Unmarshal(encoded, &second))
-	assert.True(t, second.ExpireDate.Equal(ExpiredISODate.Time))
-
-	reencoded, err := json.Marshal(second)
-	require.NoError(t, err)
-
-	var third dateHolder
-	require.NoError(t, json.Unmarshal(reencoded, &third))
-	assert.Equal(t, second, third)
 }

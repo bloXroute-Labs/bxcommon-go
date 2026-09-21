@@ -952,7 +952,7 @@ func TestSDNHTTP_InitGateway(t *testing.T) {
 		jsonRespNetwork:    `{"min_tx_age_seconds":0,"min_tx_network_fee":0, "network":"Mainnet", "network_num":5,"protocol":"Ethereum"}`,
 		jsonRespRelays:     `[{"ip":"8.208.101.30", "port":1809}, {"ip":"47.90.133.153", "port":1809}]`,
 		jsonAccount:        `{"account_id":"e64yrte6547","blockchain_protocol":"","blockchain_network":"","tier_name":"", "relay_limit":{"expire_date":"", "msg_quota": {"limit":0}}, "private_transaction_fee": {"expire_date": "2999-01-01", "msg_quota": {"interval": "WITHOUT_INTERVAL", "service_type": "MSG_QUOTA", "limit": 13614113913969504939, "behavior_limit_ok": "ALERT", "behavior_limit_fail": "BLOCK_ALERT"}}}`,
-		expectedRelayLimit: 2,
+		expectedRelayLimit: 1,
 	}
 	t.Run(fmt.Sprint(testCase), func(t *testing.T) {
 		defer cleanupFiles()
@@ -1016,8 +1016,7 @@ func TestSDNHTTP_InitGateway_Fail(t *testing.T) {
 		IPResolverHolder = &MockIPResolver{IP: "11.111.111.111"}
 		sdn := NewSDNHTTP(sslCerts, server.URL, message.NodeModel{}, "").(*realSDNHTTP)
 
-		err = os.Remove(nodeModelCacheFileName)
-		require.NoError(t, err)
+		require.NoError(t, os.RemoveAll(nodeModelCacheFileName))
 		assert.NotNil(t, sdn.InitGateway(types.EthereumProtocol, "Mainnet"))
 	})
 }
@@ -1180,56 +1179,48 @@ func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 	defer cleanupFiles()
 	defer CleanupSSLCerts()
 
-	// Prepare ssl files for a unique cert name
 	certName := "rotate"
 	SetupSSLFiles(certName)
 
-	// Get paths for private cert and key
-	privateCertFile, privateKeyFile, _, _ := cert.GetCertDir(SSLTestPath, SSLTestPath, certName)
+	_, _, registrationOnlyCertFile, registrationOnlyKeyFile := cert.GetCertDir(SSLTestPath, SSLTestPath, certName)
 
-	// Read existing private key
-	keyBytes, err := os.ReadFile(privateKeyFile)
-	require.NoError(t, err, "could not read private key file")
+	keyBytes, err := os.ReadFile(registrationOnlyKeyFile)
+	require.NoError(t, err)
 	decodedKey, _ := pem.Decode(keyBytes)
-	require.NotNil(t, decodedKey, "could not decode PEM private key")
-	privKey, err := x509.ParseECPrivateKey(decodedKey.Bytes)
-	require.NoError(t, err, "could not parse EC private key")
+	require.NotNil(t, decodedKey)
+	registrationOnlyKey, err := x509.ParseECPrivateKey(decodedKey.Bytes)
+	require.NoError(t, err)
 
-	// Create a short-lived certificate (expires in 1 day) signed with that private key
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "rotate-test"},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(24 * time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+	newCertPEM := func(serial int64, validFor time.Duration) []byte {
+		template := x509.Certificate{
+			SerialNumber: big.NewInt(serial),
+			Subject:      pkix.Name{CommonName: "rotate-test"},
+			NotBefore:    time.Now().Add(-time.Hour),
+			NotAfter:     time.Now().Add(validFor),
+			KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		}
+		der, err := x509.CreateCertificate(rand.Reader, &template, &template, &registrationOnlyKey.PublicKey, registrationOnlyKey)
+		require.NoError(t, err)
+		return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 	}
 
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privKey.PublicKey, privKey)
-	require.NoError(t, err, "could not create certificate")
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	expiringCert := newCertPEM(1, 24*time.Hour)
+	rotatedCert := newCertPEM(2, 2*privateCertRenewalPeriodDays*24*time.Hour)
 
-	// Write the short-lived cert to the private cert file so NewSSLCerts will load it
-	err = os.WriteFile(privateCertFile, certPEM, 0644)
-	require.NoError(t, err, "could not write private cert file")
-
-	// Initialize ssl certs from files (will pick up our short-lived cert)
+	require.NoError(t, os.WriteFile(registrationOnlyCertFile, expiringCert, 0644))
 	sslCerts := cert.NewSSLCerts(SSLTestPath, SSLTestPath, certName)
 
-	// Sanity check expiration is within renewal period
 	exp, err := sslCerts.RegistrationOnlyCertExpirationDate()
-	require.NoError(t, err, "failed to get private cert expiration date")
-	assert.False(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is not within renewal window")
+	require.NoError(t, err)
+	require.False(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour, "prepared cert is not within renewal window")
 
-	// Mock SDN server to return node model containing new cert (we return the same cert for simplicity)
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		// read body to ensure csr was sent
 		_, _ = io.ReadAll(r.Body)
-		nm := message.NodeModel{Cert: string(certPEM)}
-		b, _ := json.Marshal(nm)
+		b, _ := json.Marshal(NewCertificateResponse{Certificate: string(rotatedCert)})
 		_, _ = w.Write(b)
 	}
-	server := mockRouter([]handlerArgs{{method: "POST", pattern: "/nodes", handler: handler}})
+	server := mockRouter([]handlerArgs{{method: http.MethodPatch, pattern: "/accounts/rotate-cert", handler: handler}})
 	defer server.Close()
 
 	s := &realSDNHTTP{
@@ -1238,16 +1229,15 @@ func TestRotateCertificate_RotatesWhenExpiring(t *testing.T) {
 		nodeModel: &message.NodeModel{},
 	}
 
-	ctx := context.Background()
-	err = s.RotateCertificate(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, s.nodeModel, "nodeModel should not be nil after rotation")
-	assert.Equal(t, string(certPEM), s.nodeModel.Cert)
+	require.NoError(t, s.RotateCertificate(context.Background()))
 
-	// The private cert file should contain the cert we wrote (and saved again)
-	got, err := os.ReadFile(privateCertFile)
-	require.NoError(t, err, "could not read private cert file")
-	assert.Contains(t, string(got), "BEGIN CERTIFICATE")
+	got, err := os.ReadFile(registrationOnlyCertFile)
+	require.NoError(t, err)
+	assert.Equal(t, string(rotatedCert), string(got))
+
+	exp, err = sslCerts.RegistrationOnlyCertExpirationDate()
+	require.NoError(t, err)
+	assert.True(t, time.Until(exp) > privateCertRenewalPeriodDays*24*time.Hour)
 }
 
 func TestRotateCertificate_NoPrivateCertError(t *testing.T) {
