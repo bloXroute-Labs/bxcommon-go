@@ -202,10 +202,54 @@ func TestISODateTextCodec(t *testing.T) {
 	assert.Equal(t, 1, decoded[date])
 }
 
-func TestNewISODateKeepsTimeOfDay(t *testing.T) {
-	soon := time.Now().Add(time.Hour)
-	date := NewISODate(soon)
+func TestNewISODateIsUTCDate(t *testing.T) {
+	kyiv, err := time.LoadLocation("Europe/Kyiv")
+	require.NoError(t, err)
 
-	assert.False(t, date.Expired())
-	assert.Equal(t, soon.Format(TimeDateLayoutISO), date.Format(TimeDateLayoutISO))
+	parsed, err := ParseISODate("2026-09-21")
+	require.NoError(t, err)
+
+	for _, in := range []time.Time{
+		time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 9, 21, 23, 59, 59, 999999999, time.UTC),
+		time.Date(2026, 9, 22, 1, 0, 0, 0, kyiv),
+		time.Date(2026, 9, 21, 2, 59, 0, 0, kyiv).Add(time.Hour),
+	} {
+		assert.Equal(t, parsed, NewISODate(in), in)
+	}
+
+	assert.Equal(t, NewISODate(time.Now().UTC()), NewISODate(time.Now()), "monotonic reading is dropped")
+}
+
+func TestISODateStringAgreesWithExpired(t *testing.T) {
+	kyiv, err := time.LoadLocation("Europe/Kyiv")
+	require.NoError(t, err)
+
+	now := time.Date(2026, 9, 22, 0, 30, 0, 0, time.UTC)
+	for _, d := range []ISODate{
+		NewISODate(time.Date(2026, 9, 22, 1, 0, 0, 0, kyiv)),
+		{Time: time.Date(2026, 9, 22, 1, 0, 0, 0, kyiv)},
+	} {
+		assert.Equal(t, "2026-09-21", d.String())
+
+		b, err := json.Marshal(d)
+		require.NoError(t, err)
+
+		var back ISODate
+		require.NoError(t, json.Unmarshal(b, &back))
+		assert.Equal(t, d.expiredAt(now), back.expiredAt(now))
+		assert.True(t, back.expiredAt(now))
+	}
+}
+
+func TestISODateMapKeyByUTCDate(t *testing.T) {
+	parsed, err := ParseISODate("2026-09-21")
+	require.NoError(t, err)
+
+	m := map[ISODate]int{
+		parsed: 1,
+		NewISODate(time.Date(2026, 9, 21, 9, 0, 0, 0, time.UTC)):  2,
+		NewISODate(time.Date(2026, 9, 21, 15, 0, 0, 0, time.UTC)): 3,
+	}
+	assert.Len(t, m, 1)
 }

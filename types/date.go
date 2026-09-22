@@ -22,10 +22,10 @@ type ISODate struct {
 	time.Time
 }
 
-// NewISODate returns an ISODate carrying t. The time-of-day is preserved in memory
-// and dropped when the value is marshalled.
+// NewISODate returns the UTC calendar date of t, dropping the time of day, location and
+// monotonic reading, so it compares, marshals and keys a map the same as a parsed date.
 func NewISODate(t time.Time) ISODate {
-	return ISODate{Time: t}
+	return ISODate{Time: t.UTC().Truncate(day)}
 }
 
 // ParseISODate parses a "2006-01-02" date string.
@@ -41,7 +41,7 @@ func ParseISODate(s string) (ISODate, error) {
 // Expired reports whether expire_date < today, comparing calendar dates in UTC. It is the
 // negation of bxapi's is_service_valid, so the expiry day itself is still valid.
 func (d ISODate) Expired() bool {
-	return d.expiredAt(time.Now())
+	return d.expiredAt(time.Now().UTC())
 }
 
 // UnmarshalJSON implements deserialization for ISODate. Null, an empty string and any value
@@ -72,7 +72,7 @@ func (d *ISODate) UnmarshalJSON(b []byte) error {
 
 // String formats the date as TimeDateLayoutISO
 func (d ISODate) String() string {
-	return d.Format(TimeDateLayoutISO)
+	return d.UTC().Format(TimeDateLayoutISO)
 }
 
 // MarshalJSON implements serialization for ISODate.
@@ -105,5 +105,5 @@ func (d *ISODate) UnmarshalText(b []byte) error {
 
 // expiredAt is Expired with the clock injected, so the day boundary can be tested.
 func (d ISODate) expiredAt(now time.Time) bool {
-	return d.Truncate(day).Before(now.Truncate(day))
+	return d.UTC().Truncate(day).Before(now.UTC().Truncate(day))
 }

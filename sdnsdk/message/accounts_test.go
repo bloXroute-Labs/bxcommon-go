@@ -95,11 +95,21 @@ func TestBDNServiceLimitSaturates(t *testing.T) {
 }
 
 func TestBDNServiceLimitRejectsNonInteger(t *testing.T) {
-	for _, limit := range []string{`"10"`, `1e30`, `true`, `1.5`, `null`} {
+	for _, limit := range []string{`"10"`, `1e30`, `true`, `1.5`} {
 		var account Account
 		assert.Error(t, json.Unmarshal([]byte(
 			`{"tx_paid":{"expire_date":"2999-01-01","msg_quota":{"limit":`+limit+`}}}`), &account), limit)
 	}
+}
+
+func TestBDNServiceLimitNull(t *testing.T) {
+	var account Account
+	require.NoError(t, json.Unmarshal([]byte(
+		`{"tx_paid":{"expire_date":"2999-01-01","msg_quota":{"limit":null}},"cloud_api":{"expire_date":"2999-01-01"}}`), &account))
+
+	assert.Equal(t, BDNServiceLimit(0), account.PaidTransactions.MsgQuota.Limit)
+	assert.False(t, account.PaidTransactions.IsActive())
+	assert.True(t, account.CloudAPI.IsActive())
 }
 
 func TestAccountMiner(t *testing.T) {

@@ -160,6 +160,10 @@ type BDNQuotaService struct {
 // UnmarshalJSON saturates a quota outside int64: ParseInt already returns the bound with
 // ErrRange, so its value is used as-is. Any other parse failure is reported.
 func (i *BDNServiceLimit) UnmarshalJSON(b []byte) error {
+	if string(b) == nullJSON {
+		return nil
+	}
+
 	limit, err := json.Number(b).Int64()
 	if err != nil && !errors.Is(err, strconv.ErrRange) {
 		return err
