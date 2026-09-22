@@ -253,3 +253,24 @@ func TestISODateMapKeyByUTCDate(t *testing.T) {
 	}
 	assert.Len(t, m, 1)
 }
+
+func TestNewISODateNormalizesToUTCDay(t *testing.T) {
+	kyiv, err := time.LoadLocation("Europe/Kyiv")
+	require.NoError(t, err)
+
+	// 2026-09-23 01:00 in Kyiv is 2026-09-22 22:00 UTC.
+	d := NewISODate(time.Date(2026, 9, 23, 1, 0, 0, 0, kyiv))
+	now := time.Date(2026, 9, 23, 0, 30, 0, 0, time.UTC)
+
+	roundTripped, err := ParseISODate(d.String())
+	require.NoError(t, err)
+
+	assert.Equal(t, roundTripped.expiredAt(now), d.expiredAt(now),
+		"reports %s but expires as if it were %s", d.String(), d.UTC().Format(TimeDateLayoutISO))
+
+	sameDay := map[ISODate]int{
+		NewISODate(time.Date(2026, 9, 22, 1, 0, 0, 0, time.UTC)): 1,
+		NewISODate(time.Date(2026, 9, 22, 2, 0, 0, 0, time.UTC)): 2,
+	}
+	assert.Len(t, sameDay, 1, "one calendar date must be one map key")
+}
