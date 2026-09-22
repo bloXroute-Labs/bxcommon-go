@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/bloXroute-Labs/bxcommon-go/sdnsdk/message"
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/sdnsdk/message"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 const goroutineCount = 100

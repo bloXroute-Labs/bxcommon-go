@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 // SSLCerts represents the required certificate files for interacting with the BDN.
@@ -257,6 +257,10 @@ func (s *SSLCerts) SavePrivateCert(privateCert string) error {
 		return fmt.Errorf("could not parse private key pair: %v", err)
 	}
 	s.privateKeyPair = &privateKeyPair
+
+	if s.privateCertFile == "" {
+		return nil
+	}
 
 	return os.WriteFile(s.privateCertFile, privateCertBytes, 0644)
 }

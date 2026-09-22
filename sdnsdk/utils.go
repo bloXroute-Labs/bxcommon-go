@@ -9,7 +9,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/bloXroute-Labs/bxcommon-go/types"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/types"
 )
 
 var ErrMalformedAuthHeader = errors.New("auth header is not in the correct format")

@@ -6,8 +6,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/bloXroute-Labs/bxcommon-go/clock"
-	"github.com/bloXroute-Labs/bxcommon-go/syncmap"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/clock"
+	"github.com/bloXroute-Labs/bxcommon-go/v2/syncmap"
 )
 
 const defaultBypass = time.Second * 10
@@ -15,7 +15,7 @@ const defaultBypass = time.Second * 10
 // UpdateCacheFile - update a cache file
 func UpdateCacheFile(dataDir string, fileName string, value []byte) error {
 	cacheFileName := path.Join(dataDir, fileName)
-	f, err := os.OpenFile(cacheFileName, os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(cacheFileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
