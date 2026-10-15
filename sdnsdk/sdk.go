@@ -197,6 +197,7 @@ type UpdateAccountGradesBulkResponse struct {
 const (
 	GradeNetworkBSC = "bsc"
 	GradeNetworkETH = "eth"
+	GradeNetworkRH  = "rh"
 )
 
 type relayToSwitch struct {
@@ -1081,7 +1082,7 @@ func (s *realSDNHTTP) GetSubmissionStatusBulk(ctx context.Context, networkNum ty
 }
 
 // UpdateAccountGrade updates the grade of the given account for the given
-// network (GradeNetworkBSC or GradeNetworkETH) - each network's grade is
+// network (GradeNetworkBSC, GradeNetworkETH or GradeNetworkRH) - each network's grade is
 // independent, updating one never touches the other
 func (s *realSDNHTTP) UpdateAccountGrade(ctx context.Context, accountID types.AccountID, network string, grade int) error {
 	url := fmt.Sprintf("%v/accounts/%v/grade/%v/%v", s.sdnURL, accountID, network, grade)
@@ -1093,7 +1094,7 @@ func (s *realSDNHTTP) UpdateAccountGrade(ctx context.Context, accountID types.Ac
 }
 
 // UpdateAccountGradesBulk updates the grade of many accounts at once, for the
-// given network (GradeNetworkBSC or GradeNetworkETH), via the SDN's bulk
+// given network (GradeNetworkBSC, GradeNetworkETH or GradeNetworkRH), via the SDN's bulk
 // grade endpoint, which writes to Redis only (no relay/cloud-api broadcast).
 // Prefer this over calling UpdateAccountGrade in a loop for large batches -
 // each call there is a full HTTP/mTLS round trip against the SDN, and doing
