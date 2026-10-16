@@ -415,6 +415,7 @@ type AccountInfo struct {
 	MEVBuilders        []string        `json:"mev_builders"`
 	BSCGrade           int             `json:"bsc_grade"`
 	ETHGrade           int             `json:"eth_grade"`
+	RHGrade            int             `json:"rh_grade"`
 }
 
 // DefaultAccountGrade is the per-chain grade carried by GetDefaultEliteAccount.
@@ -441,7 +442,7 @@ func (a *AccountInfo) IsExpired() bool { return a.ExpireDate.Expired() }
 
 // GetDefaultEliteAccount get a default elite account by current time.
 //
-// Both per-chain grades are set to DefaultAccountGrade rather than left at the zero value -
+// All per-chain grades are set to DefaultAccountGrade rather than left at the zero value -
 // see that constant for why an SDN-outage fallback must not look ungraded.
 func GetDefaultEliteAccount(now time.Time) Account {
 	return Account{
@@ -456,6 +457,7 @@ func GetDefaultEliteAccount(now time.Time) Account {
 			Miner:              false,
 			BSCGrade:           DefaultAccountGrade,
 			ETHGrade:           DefaultAccountGrade,
+			RHGrade:            DefaultAccountGrade,
 		},
 		FreeTransactions: BDNQuotaService{
 			MsgQuota: BDNService{

@@ -21,6 +21,7 @@ func TestDefaultEliteAccountIsGraded(t *testing.T) {
 
 	assert.Equal(t, DefaultAccountGrade, account.AccountInfo.BSCGrade)
 	assert.Equal(t, DefaultAccountGrade, account.AccountInfo.ETHGrade)
+	assert.Equal(t, DefaultAccountGrade, account.AccountInfo.RHGrade)
 	assert.NotZero(t, DefaultAccountGrade)
 }
 
@@ -248,4 +249,13 @@ func TestDefaultEliteAccountServicesAreActive(t *testing.T) {
 	}
 
 	assert.False(t, account.BoostMEVSearcher.IsActive())
+}
+
+func TestAccountInfoPerNetworkGradesJSON(t *testing.T) {
+	var info AccountInfo
+	require.NoError(t, json.Unmarshal([]byte(`{"bsc_grade":10,"eth_grade":20,"rh_grade":30}`), &info))
+
+	assert.Equal(t, 10, info.BSCGrade)
+	assert.Equal(t, 20, info.ETHGrade)
+	assert.Equal(t, 30, info.RHGrade)
 }
