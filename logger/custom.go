@@ -19,7 +19,7 @@ func (l *Logger) Close() error {
 
 // CreateCustomLogger creates a new custom logger that only writes logs to a file
 func CreateCustomLogger(appName string, port int, fileName string, maxSize int, maxBackups int, maxAge int, logFileLevel Level) (*Logger, error) {
-	fw := fileWriter(fmt.Sprintf("logs/%v-%v-%v.log", fileName, appName, port), maxSize, maxBackups, maxAge, toZeroLogLevel(logFileLevel))
+	fw := fileWriter(fmt.Sprintf("logs/%v-%v-%v.log", fileName, appName, port), maxSize, maxBackups, maxAge, toZeroLogLevel(logFileLevel), false)
 
 	return &Logger{Logger: zerolog.New(fw).With().Timestamp().Logger(), close: fw.Close}, nil
 }

@@ -24,6 +24,8 @@ type Config struct {
 	MaxSize      int
 	MaxBackups   int
 	MaxAge       int
+	// FileJSON writes the log file as plain JSON, one object per line, instead of text (DI-4223)
+	FileJSON bool
 }
 
 // FluentDConfig represents logger options for FluentD client
@@ -41,7 +43,7 @@ func Init(logConfig *Config, fluentDConfig *FluentDConfig, version string) (clos
 
 	stderr := stderrWriter(consoleLevel)
 
-	file := fileWriter(logConfig.FileName, logConfig.MaxSize, logConfig.MaxBackups, logConfig.MaxAge, fileLevel)
+	file := fileWriter(logConfig.FileName, logConfig.MaxSize, logConfig.MaxBackups, logConfig.MaxAge, fileLevel, logConfig.FileJSON)
 	closeFuncs = append(closeFuncs, file.Close)
 
 	writers := []io.Writer{

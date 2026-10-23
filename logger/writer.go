@@ -50,8 +50,10 @@ func stderrWriter(level zerolog.Level) *levelWriter {
 	}
 }
 
-// fileWriter returns a writer that writes to a file;
-func fileWriter(fileName string, maxSize, maxBackups, maxAge int, level zerolog.Level) *levelWriter {
+// fileWriter returns a writer that writes to a file. With jsonLines the file gets zerolog's JSON
+// lines as they are, one object per line; otherwise each line is decoded and rebuilt as text,
+// which costs about 12µs and 200 allocations per line (DI-4223).
+func fileWriter(fileName string, maxSize, maxBackups, maxAge int, level zerolog.Level, jsonLines bool) *levelWriter {
 	w := &lumberjack.Logger{
 		Filename:   fileName,
 		MaxSize:    maxSize,
@@ -61,8 +63,13 @@ func fileWriter(fileName string, maxSize, maxBackups, maxAge int, level zerolog.
 		Compress:   false,
 	}
 
+	var out io.Writer = w
+	if !jsonLines {
+		out = newWriter(w, true)
+	}
+
 	return &levelWriter{
-		WriteCloser: diode.NewWriter(newWriter(w, true), backLog, 100*time.Millisecond, logOverflowAlerter),
+		WriteCloser: diode.NewWriter(out, backLog, 100*time.Millisecond, logOverflowAlerter),
 		minLevel:    zerolog.TraceLevel,
 		maxLevel:    zerolog.PanicLevel,
 		systemLevel: level,
