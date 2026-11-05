@@ -33,6 +33,9 @@ const RobinhoodMainnet = "Robinhood-Mainnet"
 // ArcMainnet - for Arc main net blockchain network name
 const ArcMainnet = "Arc-Mainnet"
 
+// ElysiumMainnet - for Elysium Mainnet blockchain network name
+const ElysiumMainnet = "Elysium-Mainnet"
+
 // MainnetNum - for Ethereum main net blockchain network number
 const MainnetNum NetworkNum = 5
 
@@ -59,6 +62,9 @@ const RobinhoodChainID = 4663
 
 // ArcChainID - Arc chain ID
 const ArcChainID = 5042
+
+// ElysiumChainID - Elysium chain ID
+const ElysiumChainID = 99901
 
 // EthChainID - eth chain ID
 const EthChainID NetworkID = 1
@@ -90,6 +96,9 @@ const RobinhoodMainnetNum NetworkNum = 4663
 // ArcMainnetNum - for Arc main net network number
 const ArcMainnetNum NetworkNum = 5042
 
+// ElysiumMainnetNum - for Elysium mainnet network number
+const ElysiumMainnetNum NetworkNum = 99901
+
 // BlockchainNetworkToNetworkNum converts blockchain network to number
 var BlockchainNetworkToNetworkNum = map[string]NetworkNum{
 	Mainnet:            MainnetNum,
@@ -103,6 +112,7 @@ var BlockchainNetworkToNetworkNum = map[string]NetworkNum{
 	PolygonMainnet:     PolygonMainnetNum,
 	RobinhoodMainnet:   RobinhoodMainnetNum,
 	ArcMainnet:         ArcMainnetNum,
+	ElysiumMainnet:     ElysiumMainnetNum,
 }
 
 // NetworkNumToChainID - Mapping from networkNum to chainID
@@ -117,6 +127,7 @@ var NetworkNumToChainID = map[NetworkNum]NetworkID{
 	PolygonMainnetNum:   PolygonChainID,
 	RobinhoodMainnetNum: RobinhoodChainID,
 	ArcMainnetNum:       ArcChainID,
+	ElysiumMainnetNum:   ElysiumChainID,
 }
 
 // NetworkNumToBlockchainNetwork - Mapping from networkNum to blockchain network
@@ -132,6 +143,7 @@ var NetworkNumToBlockchainNetwork = map[NetworkNum]string{
 	PolygonMainnetNum:   PolygonMainnet,
 	RobinhoodMainnetNum: RobinhoodMainnet,
 	ArcMainnetNum:       ArcMainnet,
+	ElysiumMainnetNum:   ElysiumMainnet,
 }
 
 var (
