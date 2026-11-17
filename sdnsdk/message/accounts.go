@@ -363,6 +363,10 @@ type Account struct {
 	BaseBoosterNetwork             BDNBasicService `json:"base_booster_network"`
 	BaseStateDiffStreaming         BDNQuotaService `json:"base_state_diff_streaming"`
 
+	// RobinhoodRelayStreaming gates access to the Robinhood feed relay until
+	// its expire date (TCS-9586). Not set in the default Elite account.
+	RobinhoodRelayStreaming BDNBasicService `json:"robinhood_relay_streaming"`
+
 	OnlineSolanaGateways       BDNQuotaService            `json:"online_solana_gateways"`
 	SolanaShredStreams         BDNQuotaService            `json:"solana_shred_streams"`
 	SolanaRegionalShredStreams map[string]BDNQuotaService `json:"solana_regional_shred_streams"`

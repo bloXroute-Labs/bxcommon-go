@@ -259,3 +259,32 @@ func TestAccountInfoPerNetworkGradesJSON(t *testing.T) {
 	assert.Equal(t, 20, info.ETHGrade)
 	assert.Equal(t, 30, info.RHGrade)
 }
+
+func TestAccountRobinhoodRelayStreaming(t *testing.T) {
+	today := time.Now().UTC().Format(types.TimeDateLayoutISO)
+	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format(types.TimeDateLayoutISO)
+
+	for name, tc := range map[string]struct {
+		payload string
+		active  bool
+	}{
+		"today, inclusive": {`{"robinhood_relay_streaming":{"expire_date":"` + today + `"}}`, true},
+		"lifetime":         {`{"robinhood_relay_streaming":{"expire_date":"2999-01-01"}}`, true},
+		"yesterday":        {`{"robinhood_relay_streaming":{"expire_date":"` + yesterday + `"}}`, false},
+		"disabled":         {`{"robinhood_relay_streaming":{"expire_date":"1970-01-01"}}`, false},
+		"null":             {`{"robinhood_relay_streaming":null}`, false},
+		"absent":           {`{}`, false},
+	} {
+		var account Account
+		require.NoError(t, json.Unmarshal([]byte(tc.payload), &account), name)
+		assert.Equal(t, tc.active, account.RobinhoodRelayStreaming.IsActive(), name)
+	}
+
+	var account Account
+	require.NoError(t, json.Unmarshal([]byte(`{"robinhood_relay_streaming":{"expire_date":"2999-01-01"}}`), &account))
+	encoded, err := json.Marshal(account)
+	require.NoError(t, err)
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(encoded, &fields))
+	assert.JSONEq(t, `{"expire_date":"2999-01-01"}`, string(fields["robinhood_relay_streaming"]))
+}
