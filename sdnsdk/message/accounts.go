@@ -304,6 +304,7 @@ var (
 type Account struct {
 	AccountInfo
 	SecretHash                          string                 `json:"secret_hash"`
+	SecretHashNew                       string                 `json:"secret_hash_new,omitempty"`
 	FreeTransactions                    BDNQuotaService        `json:"tx_free"`
 	PaidTransactions                    BDNQuotaService        `json:"tx_paid"`
 	CloudAPI                            BDNBasicService        `json:"cloud_api"`
@@ -376,6 +377,14 @@ type Account struct {
 	OnlineGateways    BDNQuotaService           `json:"online_gateways"`
 	MinAllowedNodes   BDNMinAllowedNodesService `json:"min_allowed_nodes"`
 	BDNPrivateRegions BDNBasicService           `json:"bdn_private_regions"`
+}
+
+// ValidateSecret returns an error unless secret is nonempty and matches either account hash.
+func (a *Account) ValidateSecret(secret string) error {
+	if secret == "" || (secret != a.SecretHash && secret != a.SecretHashNew) {
+		return errors.New("invalid account secret")
+	}
+	return nil
 }
 
 // Validate verifies the response that the response from bxapi is well understood

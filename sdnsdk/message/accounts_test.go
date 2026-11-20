@@ -43,6 +43,33 @@ const accountPayload = `{
   "secret_hash": "***"
 }`
 
+func TestAccountValidateSecret(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		payload string
+		secret  string
+		wantErr bool
+	}{
+		{"legacy payload", `{"secret_hash":"old"}`, "old", false},
+		{"legacy hash", `{"secret_hash":"old","secret_hash_new":"new"}`, "old", false},
+		{"new hash", `{"secret_hash":"old","secret_hash_new":"new"}`, "new", false},
+		{"wrong hash", `{"secret_hash":"old","secret_hash_new":"new"}`, "other", true},
+		{"empty secret", `{"secret_hash":"old"}`, "", true},
+		{"null new hash", `{"secret_hash":"old","secret_hash_new":null}`, "new", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var account Account
+			require.NoError(t, json.Unmarshal([]byte(tt.payload), &account))
+			err := account.ValidateSecret(tt.secret)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestAccountExpireDates(t *testing.T) {
 	var account Account
 	require.NoError(t, json.Unmarshal([]byte(accountPayload), &account))
