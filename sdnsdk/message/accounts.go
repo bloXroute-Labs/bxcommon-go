@@ -304,7 +304,7 @@ var (
 type Account struct {
 	AccountInfo
 	SecretHash                          string                 `json:"secret_hash"`
-	SecretHashNew                       string                 `json:"secret_hash_new,omitempty"`
+	SecretHashOld                       string                 `json:"secret_hash_old,omitempty"`
 	FreeTransactions                    BDNQuotaService        `json:"tx_free"`
 	PaidTransactions                    BDNQuotaService        `json:"tx_paid"`
 	CloudAPI                            BDNBasicService        `json:"cloud_api"`
@@ -381,7 +381,7 @@ type Account struct {
 
 // ValidateSecret returns an error unless secret is nonempty and matches either account hash.
 func (a *Account) ValidateSecret(secret string) error {
-	if secret == "" || (secret != a.SecretHash && secret != a.SecretHashNew) {
+	if secret == "" || (secret != a.SecretHash && secret != a.SecretHashOld) {
 		return errors.New("invalid account secret")
 	}
 	return nil

@@ -51,11 +51,11 @@ func TestAccountValidateSecret(t *testing.T) {
 		wantErr bool
 	}{
 		{"legacy payload", `{"secret_hash":"old"}`, "old", false},
-		{"legacy hash", `{"secret_hash":"old","secret_hash_new":"new"}`, "old", false},
-		{"new hash", `{"secret_hash":"old","secret_hash_new":"new"}`, "new", false},
-		{"wrong hash", `{"secret_hash":"old","secret_hash_new":"new"}`, "other", true},
+		{"current hash", `{"secret_hash":"new","secret_hash_old":"old"}`, "new", false},
+		{"old hash", `{"secret_hash":"new","secret_hash_old":"old"}`, "old", false},
+		{"wrong hash", `{"secret_hash":"new","secret_hash_old":"old"}`, "other", true},
 		{"empty secret", `{"secret_hash":"old"}`, "", true},
-		{"null new hash", `{"secret_hash":"old","secret_hash_new":null}`, "new", true},
+		{"null old hash", `{"secret_hash":"new","secret_hash_old":null}`, "old", true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var account Account
